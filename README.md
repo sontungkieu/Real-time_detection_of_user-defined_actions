@@ -1,7 +1,7 @@
 # CollectAccelerometerDatav2
 
 This project is designed to collect accelerometer data from a mobile device using an application, which is then sent to a computer for action prediction based on predefined actions.
-
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://github.com/sontungkieu/Real-time_detection_of_user-defined_actions)
 ## Application Repository
 
 The application used for data collection can be found at [CollectAccelerometerDatav2](https://github.com/codemaivanngu/CollectAccelerometerDatav2).
