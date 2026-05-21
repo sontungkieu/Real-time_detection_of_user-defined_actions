@@ -127,9 +127,11 @@ Expected raw row format:
 user,activity,timestamp,x,y,z;
 ```
 
-## Prepare UCI HAR
+## Additional Dataset: UCI HAR
 
-UCI HAR is a recognized smartphone-based human activity recognition benchmark that uses pre-windowed inertial signals. It complements WISDM by testing the same lightweight pipeline on a second public dataset.
+UCI HAR is a recognized smartphone-based human activity recognition benchmark that uses pre-windowed 128-step inertial signals. It complements WISDM by testing the lightweight pipeline on a second public dataset with an official train/test split.
+
+This benchmark is used for credibility and reproducibility. The self-collected accelerometer workflow remains the personalized/user-defined action demo.
 
 Download and extract the dataset:
 
@@ -195,6 +197,10 @@ Generic HAR evaluation:
 uv run python scripts/evaluate_har.py \
   --config configs/uci_har_cnn1d.yaml \
   --run-dir outputs/uci_har_cnn1d
+
+uv run python scripts/evaluate_har.py \
+  --config configs/uci_har_tinytcn.yaml \
+  --run-dir outputs/uci_har_tinytcn
 ```
 
 Evaluation outputs include:
@@ -206,7 +212,7 @@ Evaluation outputs include:
 - `confusion_matrix.json`
 - `confusion_matrix.png`
 
-The main split is subject-wise to reduce leakage from overlapping windows across the same person.
+WISDM uses a subject-wise split to reduce leakage from overlapping windows across the same person. UCI HAR uses its official train/test split, with validation carved from official training subjects.
 
 ## Export TensorFlow Lite
 
@@ -214,6 +220,14 @@ The main split is subject-wise to reduce leakage from overlapping windows across
 uv run python scripts/export_tflite.py \
   --model outputs/wisdm_cnn1d/model.keras \
   --out outputs/wisdm_cnn1d/model.tflite
+```
+
+Export a UCI HAR TinyTCN model:
+
+```bash
+uv run python scripts/export_tflite.py \
+  --model outputs/uci_har_tinytcn/model.keras \
+  --out outputs/uci_har_tinytcn/model.tflite
 ```
 
 Optional float16 weight quantization:
@@ -231,6 +245,14 @@ uv run python scripts/export_tflite.py \
 uv run python scripts/benchmark_tflite.py \
   --model outputs/wisdm_cnn1d/model.tflite \
   --input-shape 1,128,4
+```
+
+Benchmark a UCI HAR TinyTCN export:
+
+```bash
+uv run python scripts/benchmark_tflite.py \
+  --model outputs/uci_har_tinytcn/model.tflite \
+  --input-shape 1,128,6
 ```
 
 This is a CPU benchmark on the developer machine, not a real Android latency measurement. Android latency should be measured inside the Android client or with Android benchmarking tools after integration.
@@ -369,10 +391,10 @@ Run setup:
 
 Model comparison:
 
-| Model | Params | Best epoch | Epochs run | Accuracy | Macro-F1 | Weighted-F1 | TFLite size | Mean ms | Median ms | P95 ms |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| UCI HAR 1D-CNN | 11,750 | 6 | 11 | 0.870 | 0.866 | 0.870 | 50.53 KB | 0.0264 | 0.0210 | 0.0464 |
-| UCI HAR TinyTCN | 14,598 | 2 | 7 | 0.851 | 0.851 | 0.851 | 65.11 KB | 0.0445 | 0.0371 | 0.0828 |
+| Dataset | Model | Params | Best epoch | Epochs run | Accuracy | Macro-F1 | Weighted-F1 | TFLite size | Mean ms | P95 ms |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| UCI HAR | 1D-CNN | 11,750 | 6 | 11 | 0.870 | 0.866 | 0.870 | 50.53 KB | 0.0264 | 0.0464 |
+| UCI HAR | TinyTCN | 14,598 | 2 | 7 | 0.851 | 0.851 | 0.851 | 65.11 KB | 0.0445 | 0.0828 |
 
 Top UCI HAR 1D-CNN confusions:
 
@@ -416,11 +438,10 @@ If `LEGACY_ACTION_MODEL` is not set, `main.py` looks for the old local filename 
 
 ## Roadmap
 
-- Broader WISDM robustness checks beyond the current seed 42/43/44 sweep.
-- Optional UCI HAR integration.
 - Android TFLite inference integration.
 - Real Android device latency measurement.
 - Session-wise protocol for self-collected personalized actions.
+- Optional PAMAP2 or WISDM smartwatch benchmark.
 - Few-shot or final-layer adaptation for user-defined actions.
 
 ## Smoke Check
