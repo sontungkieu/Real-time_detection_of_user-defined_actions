@@ -16,8 +16,12 @@ def build_cnn1d(
     model = tf.keras.Sequential(
         [
             tf.keras.layers.Input(shape=input_shape),
-            tf.keras.layers.Conv1D(32, kernel_size=5, padding="same", activation="relu"),
-            tf.keras.layers.Conv1D(64, kernel_size=3, padding="same", activation="relu"),
+            tf.keras.layers.Conv1D(
+                32, kernel_size=5, padding="same", activation="relu"
+            ),
+            tf.keras.layers.Conv1D(
+                64, kernel_size=3, padding="same", activation="relu"
+            ),
             tf.keras.layers.GlobalAveragePooling1D(),
             tf.keras.layers.Dense(64, activation="relu"),
             tf.keras.layers.Dropout(0.20),

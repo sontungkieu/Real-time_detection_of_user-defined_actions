@@ -48,7 +48,9 @@ def create_sliding_windows(
 
     if add_magnitude:
         working["magnitude"] = np.sqrt(
-            working[features[0]] ** 2 + working[features[1]] ** 2 + working[features[2]] ** 2
+            working[features[0]] ** 2
+            + working[features[1]] ** 2
+            + working[features[2]] ** 2
         )
         features.append("magnitude")
 
@@ -61,7 +63,9 @@ def create_sliding_windows(
     labels: list[str] = []
     subjects: list[str] = []
 
-    for (subject, label), group in working.groupby([subject_col, label_col], sort=False):
+    for (subject, label), group in working.groupby(
+        [subject_col, label_col], sort=False
+    ):
         values = group[features].to_numpy(dtype=np.float32)
         if len(values) < window_size:
             continue
@@ -87,11 +91,15 @@ def fit_standardizer(X_train: np.ndarray, eps: float = 1e-6) -> Standardizer:
     """Fit channel-wise mean/std on training windows only."""
 
     if X_train.ndim != 3:
-        raise ValueError(f"Expected X_train shape (windows, time, channels), got {X_train.shape}.")
+        raise ValueError(
+            f"Expected X_train shape (windows, time, channels), got {X_train.shape}."
+        )
     mean = X_train.mean(axis=(0, 1))
     std = X_train.std(axis=(0, 1))
     std = np.where(std < eps, 1.0, std)
-    return Standardizer(mean=mean.astype(float).tolist(), std=std.astype(float).tolist())
+    return Standardizer(
+        mean=mean.astype(float).tolist(), std=std.astype(float).tolist()
+    )
 
 
 def transform_windows(X: np.ndarray, standardizer: Standardizer) -> np.ndarray:

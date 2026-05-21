@@ -2,7 +2,11 @@ import numpy as np
 import pandas as pd
 
 from activity_recognition.data.splits import subject_wise_split
-from activity_recognition.data.windowing import create_sliding_windows, fit_standardizer, transform_windows
+from activity_recognition.data.windowing import (
+    create_sliding_windows,
+    fit_standardizer,
+    transform_windows,
+)
 
 
 def test_windowing_and_subject_split_do_not_overlap():

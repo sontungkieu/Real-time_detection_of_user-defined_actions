@@ -140,7 +140,16 @@ Train the MLP baseline:
 uv run python scripts/train_wisdm.py --config configs/wisdm_mlp.yaml
 ```
 
-Each run writes model and metadata under the configured `outputs/...` directory.
+Optional runtime overrides:
+
+```bash
+uv run python scripts/train_wisdm.py \
+  --config configs/wisdm_cnn1d.yaml \
+  --seed 43 \
+  --output-dir outputs/wisdm_cnn1d_seed43
+```
+
+Each run writes model and metadata under the configured `outputs/...` directory. The WISDM configs use `EarlyStopping` and `ModelCheckpoint` on validation accuracy with patience 5. When a validation set exists, `model.keras` is saved from the best validation checkpoint, and `best_model.keras` is kept beside it for traceability.
 
 ## Evaluate
 
@@ -154,6 +163,9 @@ Evaluation outputs include:
 
 - `metrics.json`
 - `classification_report.txt`
+- `confusion_analysis.json`
+- `confusion_analysis.txt`
+- `confusion_matrix.json`
 - `confusion_matrix.png`
 
 The main split is subject-wise to reduce leakage from overlapping windows across the same person.
@@ -185,6 +197,19 @@ uv run python scripts/benchmark_tflite.py \
 
 This is a CPU benchmark on the developer machine, not a real Android latency measurement. Android latency should be measured inside the Android client or with Android benchmarking tools after integration.
 
+## Repeated Seeds
+
+Run the CNN pipeline for multiple subject-wise split seeds:
+
+```bash
+uv run python scripts/run_wisdm_seeds.py \
+  --config configs/wisdm_cnn1d.yaml \
+  --seeds 42 43 44 \
+  --base-output-dir outputs/wisdm_cnn1d_seeds
+```
+
+The script trains, evaluates, exports TFLite, benchmarks each seed, and writes `seed_summary.json` plus `seed_results.csv`. Different seeds can produce different test subject sets, so both headline metrics and test supports should be interpreted as split-dependent.
+
 ## Evaluation Metrics
 
 The benchmark pipeline reports both classification quality and deployment-oriented efficiency metrics.
@@ -209,7 +234,7 @@ The benchmark pipeline reports both classification quality and deployment-orient
 
 ### Latest WISDM Run
 
-The following numbers come from a real WISDM v1.1 raw accelerometer run on this development machine. The original Fordham endpoint timed out from this environment, so the archive was downloaded from the Google Drive mirror referenced in the Curiousily WISDM tutorial and extracted to the ignored `data/raw/wisdm/` directory.
+The following numbers come from real WISDM v1.1 raw accelerometer runs on this development machine. The original Fordham endpoint timed out from this environment, so the archive was downloaded from the Google Drive mirror referenced in the Curiousily WISDM tutorial and extracted to the ignored `data/raw/wisdm/` directory.
 
 Run setup:
 
@@ -220,43 +245,53 @@ Run setup:
 | Parsed rows | 1,098,199 |
 | Classes | `Downstairs`, `Jogging`, `Sitting`, `Standing`, `Upstairs`, `Walking` |
 | Subjects | 36 |
-| Split | Subject-wise; 25 train subjects, 5 validation subjects, 6 test subjects |
-| Windows | 16,890 total; 11,528 train, 2,476 validation, 2,886 test |
+| Split | Subject-wise train/validation/test |
+| Seed 42 windows | 16,890 total; 11,528 train, 2,476 validation, 2,886 test |
 | Window shape | `128 x 4` (`x`, `y`, `z`, magnitude) |
-| Model | 1D-CNN |
-| Epochs | 30 |
-| Final train accuracy / validation accuracy | 0.986 / 0.686 |
-| Best validation accuracy | 0.791 at epoch 1 |
+| Checkpoint policy | `model.keras` is the best validation-accuracy checkpoint |
+| Early stopping | monitor `val_accuracy`, mode `max`, patience 5 |
 | Python / TensorFlow | Python 3.11.6 / TensorFlow 2.21.0 |
 | Local CPU | Intel Core i5-9300H CPU @ 2.40GHz |
 
-Classification results:
+Single-seed model comparison:
 
-| Metric | Result |
-| --- | ---: |
-| Accuracy | 0.787 |
-| Macro-F1 | 0.792 |
-| Weighted-F1 | 0.801 |
-| Test windows | 2,886 |
-| `Downstairs` precision / recall / F1 / support | 0.380 / 0.505 / 0.434 / 323 |
-| `Jogging` precision / recall / F1 / support | 0.996 / 0.941 / 0.968 / 828 |
-| `Sitting` precision / recall / F1 / support | 0.985 / 1.000 / 0.992 / 65 |
-| `Standing` precision / recall / F1 / support | 0.867 / 1.000 / 0.929 / 117 |
-| `Upstairs` precision / recall / F1 / support | 0.520 / 0.656 / 0.580 / 445 |
-| `Walking` precision / recall / F1 / support | 0.939 / 0.773 / 0.848 / 1,108 |
+| Model | Params | Best epoch | Epochs run | Accuracy | Macro-F1 | Weighted-F1 | TFLite size | Mean ms | Median ms | P95 ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1D-CNN | 11,430 | 2 | 7 | 0.751 | 0.753 | 0.761 | 49.28 KB | 0.0245 | 0.0203 | 0.0436 |
+| MLP | 74,310 | 3 | 8 | 0.742 | 0.665 | 0.728 | 293.38 KB | 0.0097 | 0.0080 | 0.0147 |
 
-Deployment-oriented results:
+1D-CNN seed sweep:
 
-| Metric | Result |
-| --- | ---: |
-| Model parameters | 11,430 |
-| Keras model size | 0.164 MB |
-| TFLite model size | 0.048 MB / 49.28 KB |
-| TFLite benchmark input | `1,128,4` |
-| TFLite benchmark runs | 500 measured + 50 warmup |
-| Mean latency | 0.0231 ms |
-| Median latency | 0.0220 ms |
-| P95 latency | 0.0242 ms |
+| Seed | Test windows | Best epoch | Accuracy | Macro-F1 | Weighted-F1 | Mean ms | P95 ms |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 42 | 2,886 | 2 | 0.751 | 0.753 | 0.761 | 0.0219 | 0.0362 |
+| 43 | 3,057 | 10 | 0.883 | 0.834 | 0.875 | 0.0212 | 0.0303 |
+| 44 | 2,702 | 2 | 0.822 | 0.655 | 0.779 | 0.0255 | 0.0392 |
+| Mean +/- std | - | - | 0.818 +/- 0.066 | 0.747 +/- 0.090 | 0.805 +/- 0.061 | 0.0229 +/- 0.0023 | 0.0352 +/- 0.0045 |
+
+Seed 42 1D-CNN per-class results:
+
+| Class | Precision | Recall | F1 | Support |
+| --- | ---: | ---: | ---: | ---: |
+| Downstairs | 0.322 | 0.412 | 0.361 | 323 |
+| Jogging | 0.991 | 0.983 | 0.987 | 828 |
+| Sitting | 0.855 | 1.000 | 0.922 | 65 |
+| Standing | 0.975 | 1.000 | 0.987 | 117 |
+| Upstairs | 0.431 | 0.497 | 0.461 | 445 |
+| Walking | 0.865 | 0.736 | 0.796 | 1,108 |
+
+Top seed 42 1D-CNN confusions:
+
+| True class | Predicted class | Count | Share of true class |
+| --- | --- | ---: | ---: |
+| Walking | Upstairs | 178 | 16.1% |
+| Upstairs | Downstairs | 155 | 34.8% |
+| Walking | Downstairs | 113 | 10.2% |
+| Downstairs | Upstairs | 112 | 34.7% |
+| Upstairs | Walking | 64 | 14.4% |
+| Downstairs | Walking | 63 | 19.5% |
+
+The strongest classes remain `Jogging`, `Sitting`, and `Standing`. `Upstairs` and `Downstairs` are consistently harder, with most of the visible confusion flowing between stair classes and `Walking`.
 
 These latency numbers are local CPU measurements with TensorFlow Lite XNNPACK. They are not Android device latency.
 
@@ -282,10 +317,10 @@ This workflow is useful for demonstrating personalization, but it should be eval
 
 ## Roadmap
 
-- WISDM benchmark experiments with subject-wise evaluation.
+- Broader WISDM robustness checks beyond the current seed 42/43/44 sweep.
 - Optional UCI HAR integration.
-- TensorFlow Lite export and size/latency reporting.
 - Android TFLite inference integration.
+- Real Android device latency measurement.
 - Session-wise protocol for self-collected personalized actions.
 - Few-shot or final-layer adaptation for user-defined actions.
 

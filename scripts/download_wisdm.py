@@ -10,13 +10,19 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-WISDM_URL = "https://www.cis.fordham.edu/wisdm/includes/datasets/latest/WISDM_ar_latest.tar.gz"
+WISDM_URL = (
+    "https://www.cis.fordham.edu/wisdm/includes/datasets/latest/WISDM_ar_latest.tar.gz"
+)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--out", default="data/raw/wisdm", help="Directory for extracted WISDM files.")
-    parser.add_argument("--manual", action="store_true", help="Only print manual download instructions.")
+    parser.add_argument(
+        "--out", default="data/raw/wisdm", help="Directory for extracted WISDM files."
+    )
+    parser.add_argument(
+        "--manual", action="store_true", help="Only print manual download instructions."
+    )
     return parser.parse_args()
 
 

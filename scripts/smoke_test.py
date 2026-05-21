@@ -13,7 +13,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from activity_recognition.data.splits import subject_wise_split
-from activity_recognition.data.windowing import create_sliding_windows, fit_standardizer, transform_windows
+from activity_recognition.data.windowing import (
+    create_sliding_windows,
+    fit_standardizer,
+    transform_windows,
+)
 from activity_recognition.models.cnn1d import build_cnn1d
 from activity_recognition.models.mlp import build_mlp
 

@@ -40,6 +40,20 @@ The main split is subject-wise. Subjects are assigned to train, validation, or t
 
 Normalization is fit on training windows only and then applied to validation/test windows. This avoids leakage from test-set statistics.
 
+The train CLI accepts `--seed` and `--output-dir` overrides so repeated subject-wise split runs can be stored side by side. The helper `scripts/run_wisdm_seeds.py` runs train, evaluation, TensorFlow Lite export, and local CPU benchmarking for a list of split seeds.
+
+## Checkpoint Policy
+
+Default WISDM configs use:
+
+- `ModelCheckpoint` on `val_accuracy`,
+- `EarlyStopping` on `val_accuracy`,
+- mode: `max`,
+- patience: 5,
+- restored best validation weights.
+
+For runs with validation data, `outputs/.../model.keras` is saved from the best validation checkpoint rather than the final epoch. `outputs/.../best_model.keras` is kept as the raw checkpoint artifact.
+
 ## Metrics
 
 Evaluation reports:
@@ -48,6 +62,10 @@ Evaluation reports:
 - macro-F1,
 - weighted-F1,
 - classification report,
-- confusion matrix.
+- confusion matrix,
+- raw confusion matrix JSON,
+- top off-diagonal confusion pairs as JSON and text.
 
 Model size and local CPU TFLite latency are reported after export.
+
+Current WISDM confusion analysis shows that `Jogging`, `Sitting`, and `Standing` are strongest, while `Upstairs` and `Downstairs` are harder and are commonly confused with each other or with `Walking`.

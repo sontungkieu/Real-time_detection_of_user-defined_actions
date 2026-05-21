@@ -70,7 +70,9 @@ def load_wisdm(raw_dir: str | Path) -> pd.DataFrame:
     frames = [_load_one(path) for path in files]
     frames = [frame for frame in frames if not frame.empty]
     if not frames:
-        raise ValueError(f"WISDM files were found in {raw_dir}, but no valid rows were parsed.")
+        raise ValueError(
+            f"WISDM files were found in {raw_dir}, but no valid rows were parsed."
+        )
 
     df = pd.concat(frames, ignore_index=True)
     df = df.dropna(subset=STANDARD_COLUMNS)

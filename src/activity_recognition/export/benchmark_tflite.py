@@ -30,7 +30,9 @@ def benchmark_tflite_model(
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
 
-    sample = _make_sample(input_shape, input_details[0]["dtype"], input_details[0].get("quantization"))
+    sample = _make_sample(
+        input_shape, input_details[0]["dtype"], input_details[0].get("quantization")
+    )
     for _ in range(warmup):
         interpreter.set_tensor(input_details[0]["index"], sample)
         interpreter.invoke()

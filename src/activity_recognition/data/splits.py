@@ -30,7 +30,9 @@ def subject_wise_split(
     subject_ids = np.asarray(subject_ids).astype(str)
     unique_subjects = np.unique(subject_ids)
     if len(unique_subjects) < 2:
-        raise ValueError("Subject-wise evaluation requires at least two unique subjects.")
+        raise ValueError(
+            "Subject-wise evaluation requires at least two unique subjects."
+        )
 
     ratio_sum = train_ratio + val_ratio + test_ratio
     if not np.isclose(ratio_sum, 1.0):

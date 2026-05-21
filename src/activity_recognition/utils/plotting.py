@@ -19,7 +19,9 @@ def save_confusion_matrix(
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    fig, ax = plt.subplots(figsize=(max(6, len(class_names) * 0.8), max(5, len(class_names) * 0.7)))
+    fig, ax = plt.subplots(
+        figsize=(max(6, len(class_names) * 0.8), max(5, len(class_names) * 0.7))
+    )
     im = ax.imshow(cm, interpolation="nearest", cmap="Blues")
     ax.figure.colorbar(im, ax=ax)
     ax.set(

@@ -15,8 +15,14 @@ from activity_recognition.training.evaluate import evaluate_from_config
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", required=True, help="Path to the YAML config used for training.")
-    parser.add_argument("--run-dir", required=True, help="Directory containing model.keras and metadata.")
+    parser.add_argument(
+        "--config", required=True, help="Path to the YAML config used for training."
+    )
+    parser.add_argument(
+        "--run-dir",
+        required=True,
+        help="Directory containing model.keras and metadata.",
+    )
     return parser.parse_args()
 
 

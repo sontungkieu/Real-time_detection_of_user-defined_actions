@@ -1,7 +1,10 @@
 dataset:
   name: wisdm
   raw_dir: data/raw/wisdm
-  feature_cols: [x, y, z]
+  feature_cols:
+    - x
+    - y
+    - z
   label_col: activity
   subject_col: subject_id
 
@@ -22,6 +25,19 @@ model:
   batch_size: 64
   epochs: 30
   learning_rate: 0.001
+  verbose: 2
+
+callbacks:
+  early_stopping:
+    enabled: true
+    monitor: val_accuracy
+    mode: max
+    patience: 5
+    min_delta: 0.0
+  checkpoint:
+    enabled: true
+    monitor: val_accuracy
+    mode: max
 
 output:
   dir: outputs/wisdm_mlp
