@@ -1,27 +1,27 @@
 import numpy as np
 import pandas as pd
 
-#thử dùng raw data
+# thử dùng raw data
 
-df = pd.read_csv('20240509141447.csv')
+df = pd.read_csv("20240509141447.csv")
 
 # print(df.head())
-df['time']-=min(df['time'])
-df['time']/=9
-df['f1'] = df['x']**2 + df['y']**2 + df['z']**2
-L= df['f1'].values
-LL=[]
-for i in range(0,len(L)-100,5):
-    LL.append(L[i:i+100])
+df["time"] -= min(df["time"])
+df["time"] /= 9
+df["f1"] = df["x"] ** 2 + df["y"] ** 2 + df["z"] ** 2
+L = df["f1"].values
+LL = []
+for i in range(0, len(L) - 100, 5):
+    LL.append(L[i : i + 100])
 arr = np.array(LL)
-arr = np.concatenate((arr,np.ones((arr.shape[0],1))),axis=1)
-tmp = arr[:,-1]
-tmp*=2
+arr = np.concatenate((arr, np.ones((arr.shape[0], 1))), axis=1)
+tmp = arr[:, -1]
+tmp *= 2
 df = pd.DataFrame(arr)
 print(df)
 print(arr.shape)
 
-df.to_csv("train2.csv",index=False)
+df.to_csv("train2.csv", index=False)
 
 "/////////////////////////////////////////////////////////////////////////////////////"
 # ndf = pd.DataFrame()

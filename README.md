@@ -306,6 +306,14 @@ The original user-defined action prototype is still available:
 
 This workflow is useful for demonstrating personalization, but it should be evaluated separately from public benchmark results.
 
+Legacy prototype capture files, IDE settings, and Keras model binaries are treated as local artifacts and are not tracked in git. To run `main.py`, train a local model with `model.py` or point to an existing local model:
+
+```bash
+LEGACY_ACTION_MODEL=/path/to/model.keras python main.py
+```
+
+If `LEGACY_ACTION_MODEL` is not set, `main.py` looks for the old local filename `20240610183906model.keras` in the repository root.
+
 ## Limitations
 
 - The self-collected dataset is small and may reflect only a limited set of users, devices, and environments.

@@ -45,7 +45,7 @@ dmypy.json
 *.secret
 
 # Editor, IDE, and OS files
-/.idea/
+.idea/
 .vscode/
 .DS_Store
 Thumbs.db
@@ -74,6 +74,12 @@ results/*
 # Local planning notes
 plan*
 report_v*
+
+# Legacy prototype generated local artifacts
+/data.csv
+/data.txt
+/train*.csv
+/20*.csv
 
 # Legacy/generated misc artifacts
 *.xml
