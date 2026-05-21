@@ -1,0 +1,27 @@
+dataset:
+  name: wisdm
+  raw_dir: data/raw/wisdm
+  feature_cols: [x, y, z]
+  label_col: activity
+  subject_col: subject_id
+
+window:
+  size: 128
+  step: 64
+  add_magnitude: true
+
+split:
+  method: subject_wise
+  train_ratio: 0.70
+  val_ratio: 0.15
+  test_ratio: 0.15
+  seed: 42
+
+model:
+  type: mlp
+  batch_size: 64
+  epochs: 30
+  learning_rate: 0.001
+
+output:
+  dir: outputs/wisdm_mlp

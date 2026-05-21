@@ -1,8 +1,8 @@
-keras
 numpy
 pandas
-tensorflow
 scikit-learn
+tensorflow
 matplotlib
-requests
-
+pyyaml
+tqdm
+pytest

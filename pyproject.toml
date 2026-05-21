@@ -1,0 +1,19 @@
+[project]
+name = "real-time-detection-user-defined-actions"
+version = "0.1.0"
+description = "Personalized on-device activity recognition from wearable-like motion signals"
+requires-python = ">=3.11"
+dependencies = [
+    "matplotlib>=3.10.9",
+    "numpy>=2.4.6",
+    "pandas>=3.0.3",
+    "pyyaml>=6.0.3",
+    "scikit-learn>=1.8.0",
+    "tensorflow>=2.21.0",
+    "tqdm>=4.67.3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
