@@ -311,6 +311,18 @@ Single-seed model comparison:
 | 44 | 2,702 | 2 | 0.822 | 0.655 | 0.779 | 0.0255 | 0.0392 |
 | Mean +/- std | - | - | 0.818 +/- 0.066 | 0.747 +/- 0.090 | 0.805 +/- 0.061 | 0.0229 +/- 0.0023 | 0.0352 +/- 0.0045 |
 
+README figures are generated from local benchmark outputs under `outputs/`. Regenerate them with:
+
+```bash
+uv run python scripts/generate_readme_figures.py
+```
+
+![WISDM model comparison](docs/assets/wisdm_model_comparison.png)
+
+![WISDM 1D-CNN confusion matrix](docs/assets/wisdm_confusion_matrix.png)
+
+![WISDM 1D-CNN seed sweep](docs/assets/wisdm_seed_sweep.png)
+
 Seed 42 1D-CNN per-class results:
 
 | Class | Precision | Recall | F1 | Support |
