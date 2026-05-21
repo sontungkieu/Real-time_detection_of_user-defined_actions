@@ -113,6 +113,13 @@ If automatic download fails, place the classic WISDM raw file here:
 data/raw/wisdm/WISDM_ar_v1.1_raw.txt
 ```
 
+If the Fordham endpoint times out, the same archive can also be fetched from the Google Drive mirror referenced in the Curiousily WISDM tutorial:
+
+```bash
+uvx gdown 152sWECukjvLerrVG2NUO8gtMFg83RKCF -O data/raw/wisdm/WISDM_ar_latest.tar.gz
+tar -xzf data/raw/wisdm/WISDM_ar_latest.tar.gz -C data/raw/wisdm
+```
+
 Expected raw row format:
 
 ```text
@@ -180,15 +187,78 @@ This is a CPU benchmark on the developer machine, not a real Android latency mea
 
 ## Evaluation Metrics
 
-The benchmark pipeline reports:
+The benchmark pipeline reports both classification quality and deployment-oriented efficiency metrics.
 
-- accuracy,
-- macro-F1,
-- per-class precision/recall/F1,
-- classification report,
-- confusion matrix,
-- model size,
-- TensorFlow Lite latency on local CPU.
+| Metric | What it measures | Why it matters here |
+| --- | --- | --- |
+| Accuracy | Fraction of test windows whose predicted class equals the ground-truth class. | Useful as a simple headline score, but can hide poor minority-class performance. |
+| Precision per class | Of the windows predicted as a class, the fraction that are actually that class. | Helps identify false positives, for example predicting `jogging` too often. |
+| Recall per class | Of the true windows from a class, the fraction recovered by the model. | Helps identify missed activities, for example failing to detect `walking` windows. |
+| F1 per class | Harmonic mean of per-class precision and recall. | Balances false positives and false negatives for each activity. |
+| Macro-F1 | Unweighted mean of per-class F1 scores. | Treats every activity equally, which is important when classes are imbalanced. |
+| Weighted-F1 | Mean of per-class F1 weighted by test support. | Summarizes performance while accounting for class frequency. |
+| Support | Number of test windows for each class. | Gives context for whether a per-class score is based on enough examples. |
+| Classification report | Text/table summary of precision, recall, F1, and support. | Makes per-class behavior easy to inspect. |
+| Confusion matrix | Counts of true labels versus predicted labels. | Shows which activities are confused with each other. |
+| Model parameters | Number of trainable/non-trainable Keras parameters. | Rough proxy for model complexity and memory needs. |
+| Keras model size | Size of the saved `.keras` model file. | Useful for artifact storage and comparing model variants before export. |
+| TFLite model size | Size of the exported `.tflite` file. | Directly relevant to mobile/on-device deployment. |
+| Mean latency | Average TFLite inference time across benchmark runs. | Quick estimate of typical local CPU inference cost. |
+| Median latency | Middle TFLite inference time across benchmark runs. | More robust than mean when a few runs are slow. |
+| P95 latency | 95th percentile TFLite inference time. | Captures tail latency, which matters for real-time responsiveness. |
+
+### Latest WISDM Run
+
+The following numbers come from a real WISDM v1.1 raw accelerometer run on this development machine. The original Fordham endpoint timed out from this environment, so the archive was downloaded from the Google Drive mirror referenced in the Curiousily WISDM tutorial and extracted to the ignored `data/raw/wisdm/` directory.
+
+Run setup:
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-05-21 |
+| Data source | WISDM v1.1 raw accelerometer file: `WISDM_ar_v1.1_raw.txt` |
+| Parsed rows | 1,098,199 |
+| Classes | `Downstairs`, `Jogging`, `Sitting`, `Standing`, `Upstairs`, `Walking` |
+| Subjects | 36 |
+| Split | Subject-wise; 25 train subjects, 5 validation subjects, 6 test subjects |
+| Windows | 16,890 total; 11,528 train, 2,476 validation, 2,886 test |
+| Window shape | `128 x 4` (`x`, `y`, `z`, magnitude) |
+| Model | 1D-CNN |
+| Epochs | 30 |
+| Final train accuracy / validation accuracy | 0.986 / 0.686 |
+| Best validation accuracy | 0.791 at epoch 1 |
+| Python / TensorFlow | Python 3.11.6 / TensorFlow 2.21.0 |
+| Local CPU | Intel Core i5-9300H CPU @ 2.40GHz |
+
+Classification results:
+
+| Metric | Result |
+| --- | ---: |
+| Accuracy | 0.787 |
+| Macro-F1 | 0.792 |
+| Weighted-F1 | 0.801 |
+| Test windows | 2,886 |
+| `Downstairs` precision / recall / F1 / support | 0.380 / 0.505 / 0.434 / 323 |
+| `Jogging` precision / recall / F1 / support | 0.996 / 0.941 / 0.968 / 828 |
+| `Sitting` precision / recall / F1 / support | 0.985 / 1.000 / 0.992 / 65 |
+| `Standing` precision / recall / F1 / support | 0.867 / 1.000 / 0.929 / 117 |
+| `Upstairs` precision / recall / F1 / support | 0.520 / 0.656 / 0.580 / 445 |
+| `Walking` precision / recall / F1 / support | 0.939 / 0.773 / 0.848 / 1,108 |
+
+Deployment-oriented results:
+
+| Metric | Result |
+| --- | ---: |
+| Model parameters | 11,430 |
+| Keras model size | 0.164 MB |
+| TFLite model size | 0.048 MB / 49.28 KB |
+| TFLite benchmark input | `1,128,4` |
+| TFLite benchmark runs | 500 measured + 50 warmup |
+| Mean latency | 0.0231 ms |
+| Median latency | 0.0220 ms |
+| P95 latency | 0.0242 ms |
+
+These latency numbers are local CPU measurements with TensorFlow Lite XNNPACK. They are not Android device latency.
 
 ## Original Prototype Workflow
 
