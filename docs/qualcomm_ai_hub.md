@@ -1,0 +1,202 @@
+# Qualcomm AI Hub Profiling
+
+## Why This Exists
+
+The local TensorFlow Lite CPU benchmark in this repository is a reproducibility proxy. It measures inference speed on the developer machine, not on an Android phone and not inside the full app loop.
+
+Qualcomm AI Hub can profile exported TFLite HAR models on cloud-hosted Qualcomm devices. This helps test whether the lightweight WISDM and UCI HAR models fit mobile and edge deployment constraints before full Android app integration.
+
+For tiny HAR models, CPU inference may already be sufficient. NPU profiling is still useful because it can reveal dispatch overhead, unsupported operator fallback, and whether acceleration is actually worthwhile for small motion-signal models.
+
+## Setup
+
+Install the optional Qualcomm dependencies:
+
+```bash
+uv pip install qai-hub python-dotenv
+```
+
+Or install the project extra:
+
+```bash
+uv sync --extra qualcomm
+```
+
+Put the API token in a local secret file that is ignored by git:
+
+```text
+.secrets/.env
+```
+
+Example:
+
+```text
+QUALCOMM_AI_HUB_API_KEY=your_token_here
+```
+
+Do not commit `.secrets/`, `.env`, profile outputs, compiled assets, model binaries, datasets, or benchmark artifacts.
+
+Check the environment without submitting jobs:
+
+```bash
+uv run --extra qualcomm python scripts/qaihub_check.py --list-devices
+```
+
+Optional persistent configure:
+
+```bash
+uv run --extra qualcomm python scripts/qaihub_configure_from_env.py --persist
+```
+
+This writes the token to the user's local Qualcomm AI Hub config, not to the repository.
+
+## Profile UCI HAR TinyTCN
+
+CPU profile:
+
+```bash
+uv run --extra qualcomm python scripts/profile_qualcomm_ai_hub.py \
+  --model outputs/uci_har_tinytcn/model.tflite \
+  --input-shape 1,128,6 \
+  --device "Samsung Galaxy S24 (Family)" \
+  --compute-unit cpu \
+  --wait \
+  --artifacts-dir outputs/qualcomm_ai_hub/artifacts
+```
+
+NPU profile:
+
+```bash
+uv run --extra qualcomm python scripts/profile_qualcomm_ai_hub.py \
+  --model outputs/uci_har_tinytcn/model.tflite \
+  --input-shape 1,128,6 \
+  --device "Samsung Galaxy S24 (Family)" \
+  --compute-unit npu \
+  --wait \
+  --artifacts-dir outputs/qualcomm_ai_hub/artifacts
+```
+
+## Repeated Profiles
+
+Run repeated profiles to measure run-to-run variance:
+
+```bash
+uv run --extra qualcomm python scripts/run_qaihub_repeated_profiles.py \
+  --model outputs/uci_har_tinytcn/model.tflite \
+  --input-shape 1,128,6 \
+  --device "Samsung Galaxy S24 (Family)" \
+  --compute-units cpu npu \
+  --runs 5 \
+  --wait
+```
+
+The runner writes one summary JSON per run plus `manifest.json` and `manifest.csv` under `outputs/qualcomm_ai_hub/repeated/`.
+
+Use dry-run mode to validate paths and arguments without submitting jobs:
+
+```bash
+uv run python scripts/run_qaihub_repeated_profiles.py \
+  --model outputs/uci_har_tinytcn/model.tflite \
+  --input-shape 1,128,6 \
+  --compute-units cpu npu \
+  --runs 1 \
+  --dry-run
+```
+
+## Structured Metric Export
+
+Export clean JSON/CSV metrics from downloaded or manually saved runtime logs:
+
+```bash
+uv run python scripts/export_qaihub_profile_metrics.py \
+  --logs j5wm0e06g_runtime.log jp3qljll5_runtime.log \
+  --output-json outputs/qualcomm_ai_hub/profile_metrics.json \
+  --output-csv outputs/qualcomm_ai_hub/profile_metrics.csv \
+  --layer-csv outputs/qualcomm_ai_hub/profile_layers.csv
+```
+
+The export converts log memory ranges from kB to MB and keeps the original range semantics:
+
+- `increase_min_mb` / `increase_max_mb`: memory increase range reported by the profiler.
+- `peak_delta_min_mb` / `peak_delta_max_mb`: peak range reported by the profiler.
+- `cold_load`, `warm_load`, `inference`, and `by_layer` phases are kept separate.
+
+If Qualcomm Workbench shows the Runtime Analysis table, copy it into a text file or pipe it through stdin:
+
+```bash
+uv run python scripts/export_qaihub_profile_metrics.py \
+  --logs jp3qljll5_runtime.log \
+  --runtime-analysis jp3qljll5=runtime_analysis_copy.txt
+```
+
+The Runtime Analysis source gives the cleanest op placement breakdown because it includes `NPU (QNN)` versus `CPU (TfLite)` placement per layer.
+
+## Numeric Parity
+
+Compare local TensorFlow Lite output with AI Hub inference output for a deterministic synthetic input:
+
+```bash
+uv run --extra qualcomm python scripts/qaihub_numeric_parity.py \
+  --model outputs/uci_har_tinytcn/model.tflite \
+  --input-shape 1,128,6 \
+  --device "Samsung Galaxy S24 (Family)" \
+  --compute-unit cpu \
+  --wait \
+  --output-json outputs/qualcomm_ai_hub/numeric_parity_cpu.json
+```
+
+Run the same check for the requested NPU path:
+
+```bash
+uv run --extra qualcomm python scripts/qaihub_numeric_parity.py \
+  --model outputs/uci_har_tinytcn/model.tflite \
+  --input-shape 1,128,6 \
+  --device "Samsung Galaxy S24 (Family)" \
+  --compute-unit npu \
+  --wait \
+  --output-json outputs/qualcomm_ai_hub/numeric_parity_npu.json
+```
+
+The default tolerance is `atol=1e-4`, `rtol=1e-4`. CPU should normally be near bit-level parity. NPU/QNN can have larger floating-point differences, so report both strict allclose status and task-level behavior such as top-class match.
+
+## Profile UCI HAR 1D-CNN Fallback
+
+```bash
+uv run --extra qualcomm python scripts/profile_qualcomm_ai_hub.py \
+  --model outputs/uci_har_cnn1d/model.tflite \
+  --input-shape 1,128,6 \
+  --device "Samsung Galaxy S24 (Family)" \
+  --compute-unit cpu \
+  --wait
+```
+
+## Manual Commands
+
+Print CLI commands without reading or printing the real API token:
+
+```bash
+uv run python scripts/print_qaihub_commands.py \
+  --model outputs/uci_har_tinytcn/model.tflite \
+  --device "Samsung Galaxy S24 (Family)"
+```
+
+## Interpreting Results
+
+Qualcomm AI Hub profile latency is not Android app end-to-end latency. App latency also includes sensor collection, window buffering, preprocessing, UI work, and OS scheduling.
+
+NPU profiling may not be faster for tiny models because dispatch overhead can dominate. NPU jobs can also fail or fall back if a runtime or operator is unsupported. If that happens, document the result directly instead of treating it as a model failure.
+
+Profile summaries are written under:
+
+```text
+outputs/qualcomm_ai_hub/
+```
+
+Those files are local artifacts and must remain untracked.
+
+## Result Table Template
+
+| Dataset | Model | Device | Runtime | Compute unit | Latency ms | Memory MB | Status | Notes |
+| --- | --- | --- | --- | --- | ---: | ---: | --- | --- |
+| UCI HAR | TinyTCN | pending | TFLite | CPU | pending | pending | pending | Qualcomm AI Hub |
+| UCI HAR | TinyTCN | pending | TFLite | NPU | pending | pending | pending | Qualcomm AI Hub |

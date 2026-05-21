@@ -63,6 +63,8 @@ data/processed/
 /models/
 checkpoints/
 outputs/
+outputs/qualcomm_ai_hub/
+*_runtime.log
 results/*
 !results/README.md
 
@@ -70,6 +72,12 @@ results/*
 *.h5
 *.keras
 *.pkl
+*.qnn
+*.dlc
+*.bin
+*.so
+*.onnx
+*.ort
 
 # Local planning notes
 plan*
@@ -83,3 +91,7 @@ report_v*
 
 # Legacy/generated misc artifacts
 *.xml
+
+# Local integration secrets
+.secrets/
+/.secrets/

@@ -257,6 +257,64 @@ uv run python scripts/benchmark_tflite.py \
 
 This is a CPU benchmark on the developer machine, not a real Android latency measurement. Android latency should be measured inside the Android client or with Android benchmarking tools after integration.
 
+## Optional Qualcomm AI Hub Profiling
+
+Exported TFLite HAR models can optionally be profiled on Qualcomm AI Hub. Local CPU benchmarks remain the reproducible baseline proxy, while Qualcomm AI Hub profiling provides deployment-oriented evidence on cloud-hosted Qualcomm devices.
+
+This workflow is optional and requires local Qualcomm credentials. See [docs/qualcomm_ai_hub.md](docs/qualcomm_ai_hub.md). Do not interpret Qualcomm AI Hub latency as Android app end-to-end latency unless it is measured inside the Android app.
+
+Latest UCI HAR TinyTCN Qualcomm AI Hub structured metrics:
+
+| Requested unit | Job ID | Runtime path | Delegate coverage | Cold load ms | Warm load ms min/mean/max | Inference ms | Inference 100x wall s | By-layer 100x wall s | Inference memory increase MB | Status |
+| --- | --- | --- | --- | ---: | --- | ---: | ---: | ---: | --- | --- |
+| CPU | `j5wm0e06g` | `cpu_only` | XNNPACK, 14 / 21 nodes | 10.280 | 1.214 / 3.824 / 6.557 | 0.036 | 0.005 | 0.009 | 0.000-0.000 | success |
+| NPU | `jp3qljll5` | `cpu_and_npu` | QNN/HTP, 17 / 21 nodes | 322.381 | 171.114 / 179.576 / 195.312 | 0.300 | 0.034 | 0.093 | 0.000-0.086 | success |
+
+Memory ranges are converted from Qualcomm runtime log `usage` fields from kB to MB. The table reports the profiler's `increase` range for the inference phase, not Android app end-to-end memory.
+
+NPU Runtime Analysis placement from Qualcomm Workbench:
+
+| Source | NPU QNN layers | CPU TfLite fallback layers | CPU fallback ops | NPU compute cycles | Kernel timing sum |
+| --- | ---: | ---: | --- | ---: | ---: |
+| `jp3qljll5` Runtime Analysis | 17 / 21 | 4 / 21 | `SPACE_TO_BATCH_ND` x2, `BATCH_TO_SPACE_ND` x2 | 85,852 | 45 us |
+
+The Workbench layer timing sum is kernel-level timing. The runtime log by-layer total for the NPU job is 0.854 ms because it includes delegate partition timing and profiler overhead.
+
+Numeric parity between local TFLite and AI Hub output on a deterministic synthetic sample:
+
+| Requested unit | Job ID | Allclose at 1e-4 | Top class local / AI Hub | Max abs diff | Mean abs diff |
+| --- | --- | --- | --- | ---: | ---: |
+| CPU | `jp4j6lq8p` | true | 4 / 4 | 5.96e-08 | 3.07e-08 |
+| NPU | `jpe40d1o5` | false | 4 / 4 | 1.09e-03 | 3.16e-04 |
+
+The NPU/QNN path keeps the same predicted class but does not meet the strict `1e-4` numeric tolerance for this sample. This is recorded as a parity finding, not hidden as a pass.
+
+Regenerate structured Qualcomm metrics from local runtime logs with:
+
+```bash
+uv run python scripts/export_qaihub_profile_metrics.py \
+  --logs j5wm0e06g_runtime.log jp3qljll5_runtime.log
+```
+
+Run repeated profiles and parity checks with:
+
+```bash
+uv run --extra qualcomm python scripts/run_qaihub_repeated_profiles.py \
+  --model outputs/uci_har_tinytcn/model.tflite \
+  --input-shape 1,128,6 \
+  --compute-units cpu npu \
+  --runs 5 \
+  --wait
+
+uv run --extra qualcomm python scripts/qaihub_numeric_parity.py \
+  --model outputs/uci_har_tinytcn/model.tflite \
+  --input-shape 1,128,6 \
+  --compute-unit cpu \
+  --wait
+```
+
+For this small TinyTCN model, the requested NPU path completes successfully but is slower than the CPU/XNNPACK path, likely because delegate and dispatch overhead dominate the tiny workload.
+
 ## Repeated Seeds
 
 Run the CNN pipeline for multiple subject-wise split seeds:
