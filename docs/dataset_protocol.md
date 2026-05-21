@@ -1,8 +1,12 @@
 # Dataset Protocol
 
-## Public Benchmark
+## Public Benchmarks
 
-The first supported public benchmark is WISDM. Raw data is expected under:
+The supported public benchmarks are WISDM and UCI HAR.
+
+## WISDM
+
+Raw WISDM data is expected under:
 
 ```text
 data/raw/wisdm/
@@ -69,3 +73,38 @@ Evaluation reports:
 Model size and local CPU TFLite latency are reported after export.
 
 Current WISDM confusion analysis shows that `Jogging`, `Sitting`, and `Standing` are strongest, while `Upstairs` and `Downstairs` are harder and are commonly confused with each other or with `Walking`.
+
+## UCI HAR
+
+UCI HAR data is expected under:
+
+```text
+data/raw/uci_har/UCI HAR Dataset/
+```
+
+Download helper:
+
+```bash
+uv run python scripts/download_uci_har.py --out data/raw/uci_har
+```
+
+UCI HAR already provides pre-windowed 128-step smartphone inertial signals, so the loader does not apply WISDM-style sliding windows. The first configs use six inertial channels:
+
+- `total_acc_x`
+- `total_acc_y`
+- `total_acc_z`
+- `body_gyro_x`
+- `body_gyro_y`
+- `body_gyro_z`
+
+The first UCI HAR protocol uses the official train/test split. Validation is split from official training subjects for checkpoint selection. This is not identical to the WISDM subject-wise train/validation/test protocol and should be described separately in reports.
+
+UCI HAR evaluation reports the same core metrics and artifacts as WISDM:
+
+- accuracy,
+- macro-F1,
+- weighted-F1,
+- classification report,
+- confusion matrix,
+- raw confusion matrix JSON,
+- top off-diagonal confusion pairs as JSON and text.

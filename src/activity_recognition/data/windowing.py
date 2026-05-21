@@ -15,6 +15,7 @@ class WindowedData:
     labels: np.ndarray
     subjects: np.ndarray
     feature_cols: list[str]
+    splits: np.ndarray | None = None
 
 
 @dataclass(frozen=True)

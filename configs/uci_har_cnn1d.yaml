@@ -1,0 +1,40 @@
+dataset:
+  name: uci_har
+  raw_dir: data/raw/uci_har
+  channels:
+    - total_acc_x
+    - total_acc_y
+    - total_acc_z
+    - body_gyro_x
+    - body_gyro_y
+    - body_gyro_z
+
+window:
+  size: 128
+
+split:
+  method: official_train_test
+  val_ratio: 0.15
+  seed: 42
+
+model:
+  type: cnn1d
+  batch_size: 64
+  epochs: 30
+  learning_rate: 0.001
+  verbose: 2
+
+callbacks:
+  early_stopping:
+    enabled: true
+    monitor: val_accuracy
+    mode: max
+    patience: 5
+    min_delta: 0.0
+  checkpoint:
+    enabled: true
+    monitor: val_accuracy
+    mode: max
+
+output:
+  dir: outputs/uci_har_cnn1d

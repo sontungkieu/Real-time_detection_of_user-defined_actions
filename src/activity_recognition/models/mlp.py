@@ -23,7 +23,7 @@ def build_mlp(
             tf.keras.layers.Dropout(0.20),
             tf.keras.layers.Dense(num_classes, activation="softmax"),
         ],
-        name="wisdm_mlp",
+        name="mlp",
     )
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),

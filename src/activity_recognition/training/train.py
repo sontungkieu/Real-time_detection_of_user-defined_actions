@@ -1,4 +1,4 @@
-"""Training pipeline for WISDM experiments."""
+"""Training pipeline for HAR experiments."""
 
 from __future__ import annotations
 
@@ -14,8 +14,11 @@ import tensorflow as tf
 import yaml
 from sklearn.preprocessing import LabelEncoder
 
+from activity_recognition.data.splits import SubjectSplit
 from activity_recognition.data.splits import subject_wise_split
+from activity_recognition.data.uci_har import load_uci_har
 from activity_recognition.data.windowing import (
+    WindowedData,
     create_sliding_windows,
     fit_standardizer,
     transform_windows,
@@ -23,6 +26,7 @@ from activity_recognition.data.windowing import (
 from activity_recognition.data.wisdm import load_wisdm
 from activity_recognition.models.cnn1d import build_cnn1d
 from activity_recognition.models.mlp import build_mlp
+from activity_recognition.models.tinytcn import build_tinytcn
 
 
 def load_config(path: str | Path) -> dict[str, Any]:
@@ -37,7 +41,7 @@ def train_from_config(
     seed_override: int | None = None,
     output_dir_override: str | Path | None = None,
 ) -> Path:
-    """Train a WISDM model and return the output directory."""
+    """Train a HAR model and return the output directory."""
 
     config_path = Path(config_path)
     config = _apply_runtime_overrides(
@@ -52,14 +56,7 @@ def train_from_config(
         best_model_path.unlink()
 
     windows = _load_windows(config)
-    split_cfg = config["split"]
-    split = subject_wise_split(
-        windows.subjects,
-        train_ratio=float(split_cfg["train_ratio"]),
-        val_ratio=float(split_cfg["val_ratio"]),
-        test_ratio=float(split_cfg["test_ratio"]),
-        seed=int(split_cfg.get("seed", 42)),
-    )
+    split = _make_split(windows, config)
 
     label_encoder = LabelEncoder()
     y_all = label_encoder.fit_transform(windows.labels)
@@ -104,9 +101,11 @@ def train_from_config(
             "feature_cols": windows.feature_cols,
             "mean": standardizer.mean,
             "std": standardizer.std,
-            "window_size": int(config["window"]["size"]),
-            "step_size": int(config["window"]["step"]),
-            "add_magnitude": bool(config["window"].get("add_magnitude", False)),
+            "window_size": int(
+                config.get("window", {}).get("size", windows.X.shape[1])
+            ),
+            "step_size": config.get("window", {}).get("step"),
+            "add_magnitude": bool(config.get("window", {}).get("add_magnitude", False)),
         },
         output_dir / "preprocessing.json",
     )
@@ -126,6 +125,8 @@ def train_from_config(
             "num_test_windows": int(len(split.test_idx)),
             "num_subjects": int(len(set(windows.subjects))),
             "classes": class_names,
+            "dataset": str(config["dataset"]["name"]),
+            "split_method": str(config.get("split", {}).get("method", "subject_wise")),
             "model_path": str(model_path),
             "best_model_path": (
                 str(best_model_path) if best_model_path.exists() else None
@@ -165,12 +166,18 @@ def _set_global_seed(seed: int) -> None:
 
 def _load_windows(config: dict[str, Any]):
     dataset_cfg = config["dataset"]
-    window_cfg = config["window"]
-    if dataset_cfg.get("name") != "wisdm":
-        raise ValueError(
-            "Only dataset.name=wisdm is supported by this training pipeline."
+    dataset_name = str(dataset_cfg.get("name", "")).lower()
+
+    if dataset_name == "uci_har":
+        return load_uci_har(
+            dataset_cfg["raw_dir"],
+            channels=dataset_cfg.get("channels"),
         )
 
+    if dataset_name != "wisdm":
+        raise ValueError(f"Unsupported dataset.name: {dataset_name}")
+
+    window_cfg = config["window"]
     df = load_wisdm(dataset_cfg["raw_dir"])
     return create_sliding_windows(
         df,
@@ -180,6 +187,74 @@ def _load_windows(config: dict[str, Any]):
         subject_col=dataset_cfg["subject_col"],
         feature_cols=dataset_cfg["feature_cols"],
         add_magnitude=bool(window_cfg.get("add_magnitude", False)),
+    )
+
+
+def _make_split(windows: WindowedData, config: dict[str, Any]) -> SubjectSplit:
+    split_cfg = config["split"]
+    split_method = str(split_cfg.get("method", "subject_wise"))
+    if split_method == "official_train_test":
+        return _official_train_test_split(
+            windows,
+            val_ratio=float(split_cfg.get("val_ratio", 0.15)),
+            seed=int(split_cfg.get("seed", 42)),
+        )
+
+    if split_method != "subject_wise":
+        raise ValueError(f"Unsupported split.method: {split_method}")
+
+    return subject_wise_split(
+        windows.subjects,
+        train_ratio=float(split_cfg["train_ratio"]),
+        val_ratio=float(split_cfg["val_ratio"]),
+        test_ratio=float(split_cfg["test_ratio"]),
+        seed=int(split_cfg.get("seed", 42)),
+    )
+
+
+def _official_train_test_split(
+    windows: WindowedData,
+    val_ratio: float,
+    seed: int,
+) -> SubjectSplit:
+    if windows.splits is None:
+        raise ValueError("official_train_test split requires dataset-provided splits.")
+
+    split_names = windows.splits.astype(str)
+    train_pool_idx = np.flatnonzero(split_names == "train")
+    test_idx = np.flatnonzero(split_names == "test")
+    if len(train_pool_idx) == 0 or len(test_idx) == 0:
+        raise ValueError(
+            "official_train_test split requires non-empty train and test sets."
+        )
+
+    train_subjects_pool = np.unique(windows.subjects[train_pool_idx].astype(str))
+    rng = np.random.default_rng(seed)
+    shuffled_subjects = train_subjects_pool.copy()
+    rng.shuffle(shuffled_subjects)
+
+    if val_ratio > 0 and len(shuffled_subjects) > 1:
+        n_val = max(1, int(round(len(shuffled_subjects) * val_ratio)))
+        n_val = min(n_val, len(shuffled_subjects) - 1)
+    else:
+        n_val = 0
+
+    val_subjects = shuffled_subjects[:n_val].tolist()
+    train_subjects = shuffled_subjects[n_val:].tolist()
+
+    train_idx = train_pool_idx[
+        np.isin(windows.subjects[train_pool_idx], train_subjects)
+    ]
+    val_idx = train_pool_idx[np.isin(windows.subjects[train_pool_idx], val_subjects)]
+    test_subjects = np.unique(windows.subjects[test_idx].astype(str)).tolist()
+
+    return SubjectSplit(
+        train_idx=train_idx,
+        val_idx=val_idx,
+        test_idx=test_idx,
+        train_subjects=train_subjects,
+        val_subjects=val_subjects,
+        test_subjects=test_subjects,
     )
 
 
@@ -197,6 +272,12 @@ def _build_model(
         )
     if model_type == "cnn1d":
         return build_cnn1d(
+            input_shape=input_shape,
+            num_classes=num_classes,
+            learning_rate=learning_rate,
+        )
+    if model_type == "tinytcn":
+        return build_tinytcn(
             input_shape=input_shape,
             num_classes=num_classes,
             learning_rate=learning_rate,

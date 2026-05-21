@@ -20,6 +20,7 @@ from activity_recognition.data.windowing import (
 )
 from activity_recognition.models.cnn1d import build_cnn1d
 from activity_recognition.models.mlp import build_mlp
+from activity_recognition.models.tinytcn import build_tinytcn
 
 
 def main() -> None:
@@ -46,12 +47,16 @@ def main() -> None:
 
     mlp = build_mlp(X.shape[1:], num_classes=num_classes, verbose=False)
     cnn = build_cnn1d(X.shape[1:], num_classes=num_classes, verbose=False)
+    tinytcn = build_tinytcn(X.shape[1:], num_classes=num_classes, verbose=False)
 
     sample = X[:2]
     assert mlp(sample).shape == (2, num_classes)
     assert cnn(sample).shape == (2, num_classes)
+    assert tinytcn(sample).shape == (2, num_classes)
     assert not set(split.train_subjects) & set(split.test_subjects)
-    print("Smoke test passed: windowing, subject split, MLP, and 1D-CNN are usable.")
+    print(
+        "Smoke test passed: windowing, subject split, MLP, 1D-CNN, and TinyTCN are usable."
+    )
 
 
 def _synthetic_motion_dataframe() -> pd.DataFrame:

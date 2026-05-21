@@ -16,7 +16,7 @@ The repository started as an early Python prototype for collecting mobile accele
 
 - The original Python prototype is still present in the root scripts (`recordData.py`, `processData.py`, `model.py`, `main.py`, `visualization.py`).
 - A new benchmark-oriented Python package has been added under `src/activity_recognition/`.
-- WISDM integration, subject-wise splitting, MLP/1D-CNN baselines, training/evaluation scripts, TensorFlow Lite export, and local CPU latency benchmarking are implemented.
+- WISDM and UCI HAR public benchmark support, MLP/1D-CNN/TinyTCN baselines, training/evaluation scripts, TensorFlow Lite export, and local CPU latency benchmarking are implemented.
 - The Android data-collection client exists separately at <https://github.com/codemaivanngu/CollectAccelerometerDatav2>.
 - Full Android on-device inference is planned through TensorFlow Lite, but this repository currently benchmarks TFLite on the developer machine CPU unless integrated into the Android client.
 
@@ -43,7 +43,7 @@ Android Studio is only needed for the mobile demo. The Python benchmark pipeline
 ## Project Layout
 
 ```text
-configs/                         WISDM experiment configs
+configs/                         WISDM and UCI HAR experiment configs
 src/activity_recognition/         New research-oriented Python package
 scripts/                          CLI entry points for data, train, eval, export, benchmark
 docs/                             Project protocol and limitation notes
@@ -62,9 +62,10 @@ Public benchmark path:
 
 ```text
 WISDM dataset
--> preprocessing/windowing
--> subject-wise train/validation/test split
--> train MLP or 1D-CNN
+or UCI HAR dataset
+-> preprocessing/windowing or pre-windowed inertial signals
+-> benchmark-specific train/validation/test split
+-> train MLP, 1D-CNN, or TinyTCN
 -> evaluate accuracy, macro-F1, classification report, confusion matrix
 -> export TensorFlow Lite
 -> benchmark local CPU latency and model size
@@ -126,6 +127,28 @@ Expected raw row format:
 user,activity,timestamp,x,y,z;
 ```
 
+## Prepare UCI HAR
+
+UCI HAR is a recognized smartphone-based human activity recognition benchmark that uses pre-windowed inertial signals. It complements WISDM by testing the same lightweight pipeline on a second public dataset.
+
+Download and extract the dataset:
+
+```bash
+uv run python scripts/download_uci_har.py --out data/raw/uci_har
+```
+
+Expected extracted directory:
+
+```text
+data/raw/uci_har/UCI HAR Dataset/
+```
+
+The first UCI HAR configs use these six channels by default:
+
+```text
+total_acc_x, total_acc_y, total_acc_z, body_gyro_x, body_gyro_y, body_gyro_z
+```
+
 ## Train
 
 Train the 1D-CNN baseline:
@@ -138,6 +161,13 @@ Train the MLP baseline:
 
 ```bash
 uv run python scripts/train_wisdm.py --config configs/wisdm_mlp.yaml
+```
+
+Train a generic HAR config, including UCI HAR:
+
+```bash
+uv run python scripts/train_har.py --config configs/uci_har_cnn1d.yaml
+uv run python scripts/train_har.py --config configs/uci_har_tinytcn.yaml
 ```
 
 Optional runtime overrides:
@@ -157,6 +187,14 @@ Each run writes model and metadata under the configured `outputs/...` directory.
 uv run python scripts/evaluate_wisdm.py \
   --config configs/wisdm_cnn1d.yaml \
   --run-dir outputs/wisdm_cnn1d
+```
+
+Generic HAR evaluation:
+
+```bash
+uv run python scripts/evaluate_har.py \
+  --config configs/uci_har_cnn1d.yaml \
+  --run-dir outputs/uci_har_cnn1d
 ```
 
 Evaluation outputs include:
@@ -209,6 +247,10 @@ uv run python scripts/run_wisdm_seeds.py \
 ```
 
 The script trains, evaluates, exports TFLite, benchmarks each seed, and writes `seed_summary.json` plus `seed_results.csv`. Different seeds can produce different test subject sets, so both headline metrics and test supports should be interpreted as split-dependent.
+
+## Additional Model: TinyTCN
+
+TinyTCN is a lightweight temporal convolution baseline intended to capture longer temporal patterns than the simple 1D-CNN while remaining TensorFlow Lite friendly. It uses dilated `Conv1D` layers, global average pooling, and a small dense classifier without custom layers.
 
 ## Evaluation Metrics
 
@@ -294,6 +336,43 @@ Top seed 42 1D-CNN confusions:
 The strongest classes remain `Jogging`, `Sitting`, and `Standing`. `Upstairs` and `Downstairs` are consistently harder, with most of the visible confusion flowing between stair classes and `Walking`.
 
 These latency numbers are local CPU measurements with TensorFlow Lite XNNPACK. They are not Android device latency.
+
+### Latest UCI HAR Run
+
+The following numbers come from a real UCI HAR run using the official train/test split and a subject-wise validation split carved from the official training subjects. UCI HAR is already distributed as 128-step inertial signal windows, so this path does not apply WISDM-style sliding windows.
+
+Run setup:
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-05-21 |
+| Data source | UCI HAR Dataset inertial signals |
+| Classes | `LAYING`, `SITTING`, `STANDING`, `WALKING`, `WALKING_DOWNSTAIRS`, `WALKING_UPSTAIRS` |
+| Subjects | 30 |
+| Split | Official train/test; validation split from train subjects |
+| Windows | 10,299 total; 6,219 train, 1,133 validation, 2,947 test |
+| Window shape | `128 x 6` |
+| Channels | `total_acc_x`, `total_acc_y`, `total_acc_z`, `body_gyro_x`, `body_gyro_y`, `body_gyro_z` |
+| Checkpoint policy | `model.keras` is the best validation-accuracy checkpoint |
+
+Model comparison:
+
+| Model | Params | Best epoch | Epochs run | Accuracy | Macro-F1 | Weighted-F1 | TFLite size | Mean ms | Median ms | P95 ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| UCI HAR 1D-CNN | 11,750 | 6 | 11 | 0.870 | 0.866 | 0.870 | 50.53 KB | 0.0264 | 0.0210 | 0.0464 |
+| UCI HAR TinyTCN | 14,598 | 2 | 7 | 0.851 | 0.851 | 0.851 | 65.11 KB | 0.0445 | 0.0371 | 0.0828 |
+
+Top UCI HAR 1D-CNN confusions:
+
+| True class | Predicted class | Count | Share of true class |
+| --- | --- | ---: | ---: |
+| SITTING | STANDING | 88 | 17.9% |
+| STANDING | SITTING | 77 | 14.5% |
+| WALKING_DOWNSTAIRS | WALKING | 52 | 12.4% |
+| WALKING | WALKING_DOWNSTAIRS | 52 | 10.5% |
+| WALKING_UPSTAIRS | WALKING_DOWNSTAIRS | 43 | 9.1% |
+
+The first UCI HAR result is a baseline sanity check, not a tuned benchmark. The largest confusions are between posture classes (`SITTING`/`STANDING`) and nearby walking/stair classes.
 
 ## Original Prototype Workflow
 
