@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import random
+import subprocess
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -24,9 +25,7 @@ from activity_recognition.data.windowing import (
     transform_windows,
 )
 from activity_recognition.data.wisdm import load_wisdm
-from activity_recognition.models.cnn1d import build_cnn1d
-from activity_recognition.models.mlp import build_mlp
-from activity_recognition.models.tinytcn import build_tinytcn
+from activity_recognition.models.registry import build_model
 
 
 def load_config(path: str | Path) -> dict[str, Any]:
@@ -40,12 +39,22 @@ def train_from_config(
     config_path: str | Path,
     seed_override: int | None = None,
     output_dir_override: str | Path | None = None,
+    model_override: str | None = None,
+    epochs_override: int | None = None,
+    batch_size_override: int | None = None,
+    learning_rate_override: float | None = None,
 ) -> Path:
     """Train a HAR model and return the output directory."""
 
     config_path = Path(config_path)
     config = _apply_runtime_overrides(
-        load_config(config_path), seed_override, output_dir_override
+        load_config(config_path),
+        seed_override,
+        output_dir_override,
+        model_override,
+        epochs_override,
+        batch_size_override,
+        learning_rate_override,
     )
     _set_global_seed(int(config["split"].get("seed", 42)))
 
@@ -131,8 +140,12 @@ def train_from_config(
             "best_model_path": (
                 str(best_model_path) if best_model_path.exists() else None
             ),
+            "model_name": str(config["model"]["type"]).lower(),
             "model_parameters": int(model.count_params()),
+            "input_shape": list(X_train.shape[1:]),
+            "num_classes": int(len(class_names)),
             "seed": int(config["split"].get("seed", 42)),
+            "commit_hash": _git_commit_hash(),
             "epochs_requested": int(config["model"]["epochs"]),
             "epochs_ran": int(len(history_frame)),
             **callback_summary,
@@ -149,12 +162,28 @@ def _apply_runtime_overrides(
     config: dict[str, Any],
     seed_override: int | None,
     output_dir_override: str | Path | None,
+    model_override: str | None,
+    epochs_override: int | None,
+    batch_size_override: int | None,
+    learning_rate_override: float | None,
 ) -> dict[str, Any]:
     effective_config = deepcopy(config)
     if seed_override is not None:
         effective_config.setdefault("split", {})["seed"] = int(seed_override)
     if output_dir_override is not None:
         effective_config.setdefault("output", {})["dir"] = str(output_dir_override)
+    if model_override is not None:
+        effective_config.setdefault("model", {})["type"] = str(model_override)
+    if epochs_override is not None:
+        effective_config.setdefault("model", {})["epochs"] = int(epochs_override)
+    if batch_size_override is not None:
+        effective_config.setdefault("model", {})["batch_size"] = int(
+            batch_size_override
+        )
+    if learning_rate_override is not None:
+        effective_config.setdefault("model", {})["learning_rate"] = float(
+            learning_rate_override
+        )
     return effective_config
 
 
@@ -263,26 +292,12 @@ def _build_model(
 ) -> tf.keras.Model:
     model_cfg = config["model"]
     model_type = model_cfg["type"].lower()
-    learning_rate = float(model_cfg.get("learning_rate", 0.001))
-    if model_type == "mlp":
-        return build_mlp(
-            input_shape=input_shape,
-            num_classes=num_classes,
-            learning_rate=learning_rate,
-        )
-    if model_type == "cnn1d":
-        return build_cnn1d(
-            input_shape=input_shape,
-            num_classes=num_classes,
-            learning_rate=learning_rate,
-        )
-    if model_type == "tinytcn":
-        return build_tinytcn(
-            input_shape=input_shape,
-            num_classes=num_classes,
-            learning_rate=learning_rate,
-        )
-    raise ValueError(f"Unsupported model.type: {model_type}")
+    return build_model(
+        model_type,
+        input_shape=input_shape,
+        num_classes=num_classes,
+        config=model_cfg,
+    )
 
 
 def _build_callbacks(
@@ -390,3 +405,18 @@ def _best_epoch_summary(
 
 def _save_json(data: Any, path: str | Path) -> None:
     Path(path).write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _git_commit_hash() -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None

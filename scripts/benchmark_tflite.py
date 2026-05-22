@@ -23,9 +23,11 @@ def parse_args() -> argparse.Namespace:
         "--runs", type=int, default=500, help="Measured inference runs."
     )
     parser.add_argument("--warmup", type=int, default=50, help="Warmup inference runs.")
+    parser.add_argument("--seed", type=int, default=42, help="Synthetic input seed.")
     parser.add_argument(
         "--out", default=None, help="Optional benchmark JSON output path."
     )
+    parser.add_argument("--output", default=None, help="Alias for --out.")
     return parser.parse_args()
 
 
@@ -33,7 +35,12 @@ def main() -> None:
     args = parse_args()
     input_shape = tuple(int(part) for part in args.input_shape.split(","))
     benchmark_tflite_model(
-        args.model, input_shape, runs=args.runs, warmup=args.warmup, out_path=args.out
+        args.model,
+        input_shape,
+        runs=args.runs,
+        warmup=args.warmup,
+        seed=args.seed,
+        out_path=args.out or args.output,
     )
 
 

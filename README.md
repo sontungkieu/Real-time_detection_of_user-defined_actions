@@ -315,6 +315,42 @@ uv run --extra qualcomm python scripts/qaihub_numeric_parity.py \
 
 For this small TinyTCN model, the requested NPU path completes successfully but is slower than the CPU/XNNPACK path, likely because delegate and dispatch overhead dominate the tiny workload.
 
+## Hardware-Aware Deployment Profiling
+
+V5 extends the v4 TinyTCN finding into a CPU/GPU/NPU complexity sweep. The main deployment question is when a model becomes large and accelerator-friendly enough for GPU or NPU execution to justify delegate setup, dispatch, memory movement, and fallback overhead.
+
+Detailed local report can be regenerated at `reports/report_v5_cpu_gpu_npu_complexity_sweep.md` from ignored benchmark artifacts with `scripts/generate_v5_report.py`.
+
+Local UCI HAR TFLite results on this development machine:
+
+| Model | Params | Accuracy | TFLite size | Mean ms | P95 ms | Space/Batch fallback markers |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| TinyTCN | 14,598 | 0.896 | 65.11 KB | 0.0467 | 0.0853 | `SPACE_TO_BATCH_ND` x2, `BATCH_TO_SPACE_ND` x2 |
+| TinyCNN1D | 20,582 | 0.905 | 89.49 KB | 0.0283 | 0.0470 | none |
+| MediumConv1D | 252,870 | 0.902 | 1003.24 KB | 0.4547 | 0.8044 | none |
+
+Qualcomm AI Hub v5 repeated profile results on Samsung Galaxy S24 (Family), 5 real hosted-device runs per model/runtime:
+
+| Model | Unit | Runs | Mean ms | P95 ms | Memory MB | Energy/power |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| TinyTCN | CPU | 5 / 5 | 0.035 | 0.041 | 0.061 | not exposed |
+| TinyTCN | GPU | 5 / 5 | 0.245 | 0.272 | 0.031 | not exposed |
+| TinyTCN | NPU | 5 / 5 | 0.297 | 0.302 | 0.033 | not exposed |
+| TinyCNN1D | CPU | 5 / 5 | 0.023 | 0.025 | 0.465 | not exposed |
+| TinyCNN1D | GPU | 5 / 5 | 0.242 | 0.270 | 0.017 | not exposed |
+| TinyCNN1D | NPU | 5 / 5 | 0.066 | 0.070 | 0.031 | not exposed |
+| MediumConv1D | CPU | 5 / 5 | 0.184 | 0.188 | 0.044 | not exposed |
+| MediumConv1D | GPU | 5 / 5 | 0.665 | 0.790 | 0.089 | not exposed |
+| MediumConv1D | NPU | 5 / 5 | 0.098 | 0.104 | 0.029 | not exposed |
+
+Energy/power fields were checked in downloaded AI Hub profile artifacts and runtime logs. The current device tooling artifacts did not expose numeric energy or power measurements, so those columns are intentionally marked `not exposed`.
+
+Hosted delegate breakdown matches the local op audit: TinyTCN NPU delegated 17 / 21 nodes and fell back on `SPACE_TO_BATCH_ND` and `BATCH_TO_SPACE_ND` in every run, while TinyCNN1D NPU and MediumConv1D NPU were fully delegated across all 5 runs.
+
+Numeric parity used deterministic synthetic inputs across the same 3 model x 3 unit matrix. CPU passed strict `1e-4` allclose for all models. GPU and NPU preserved the predicted class and passed `1e-3`, but did not pass strict `1e-4`; max absolute differences were 0.000576-0.001086 for GPU and 0.000381-0.001052 for NPU.
+
+Takeaway: hardware acceleration is model-dependent. For tiny HAR models, CPU/XNNPACK remains fastest in hosted-device profiling. Removing dilation removed Space/Batch fallback markers and improved local CPU latency, but TinyCNN1D is still small enough that CPU wins. MediumConv1D is large enough for NPU to win over CPU/GPU on the measured Samsung Galaxy S24 profile matrix.
+
 ## Repeated Seeds
 
 Run the CNN pipeline for multiple subject-wise split seeds:

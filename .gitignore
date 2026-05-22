@@ -49,6 +49,7 @@ dmypy.json
 .vscode/
 .DS_Store
 Thumbs.db
+*:Zone.Identifier
 
 # Archives and downloaded bundles
 *.zip*

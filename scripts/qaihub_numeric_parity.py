@@ -28,7 +28,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input-shape", required=True)
     parser.add_argument("--device", default="Samsung Galaxy S24 (Family)")
     parser.add_argument(
-        "--compute-unit", choices=("cpu", "gpu", "npu", "auto"), default="cpu"
+        "--compute-unit",
+        choices=("cpu", "gpu", "npu", "all", "auto"),
+        default="cpu",
     )
     parser.add_argument("--env-file", default=".secrets/.env")
     parser.add_argument("--seed", type=int, default=20260521)
@@ -248,6 +250,12 @@ def _compare_outputs(
         "rtol": rtol,
         "allclose": bool(
             np.allclose(local_output, ai_hub_output, atol=atol, rtol=rtol)
+        ),
+        "allclose_at_1e_4": bool(
+            np.allclose(local_output, ai_hub_output, atol=1e-4, rtol=1e-4)
+        ),
+        "allclose_at_1e_3": bool(
+            np.allclose(local_output, ai_hub_output, atol=1e-3, rtol=1e-3)
         ),
         "max_abs_diff": float(np.max(diff)),
         "mean_abs_diff": float(np.mean(diff)),
