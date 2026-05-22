@@ -1,0 +1,27 @@
+{
+  "compute_units": [
+    "cpu",
+    "gpu",
+    "npu"
+  ],
+  "excluded": [
+    "raw Qualcomm runtime logs",
+    "downloaded AI Hub profile artifacts",
+    "TFLite files",
+    "Keras model files",
+    "raw datasets"
+  ],
+  "local_models": [
+    "tinytcn",
+    "tiny_cnn1d",
+    "medium_conv1d"
+  ],
+  "name": "v5 CPU/GPU/NPU complexity sweep curated results",
+  "numeric_parity_jobs": 9,
+  "profile_matrix": {
+    "compute_units": 3,
+    "models": 3,
+    "runs_per_pair": 5,
+    "total_profile_jobs": 45
+  }
+}

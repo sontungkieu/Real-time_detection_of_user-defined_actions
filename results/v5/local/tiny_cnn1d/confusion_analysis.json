@@ -1,0 +1,67 @@
+{
+  "top_confusions": [
+    {
+      "count": 174,
+      "pct_of_true_class": 0.32706766917293234,
+      "predicted_class": "SITTING",
+      "true_class": "STANDING",
+      "true_support": 532
+    },
+    {
+      "count": 34,
+      "pct_of_true_class": 0.07218683651804671,
+      "predicted_class": "WALKING_DOWNSTAIRS",
+      "true_class": "WALKING_UPSTAIRS",
+      "true_support": 471
+    },
+    {
+      "count": 25,
+      "pct_of_true_class": 0.05091649694501019,
+      "predicted_class": "STANDING",
+      "true_class": "SITTING",
+      "true_support": 491
+    },
+    {
+      "count": 19,
+      "pct_of_true_class": 0.038696537678207736,
+      "predicted_class": "WALKING_UPSTAIRS",
+      "true_class": "SITTING",
+      "true_support": 491
+    },
+    {
+      "count": 9,
+      "pct_of_true_class": 0.02142857142857143,
+      "predicted_class": "WALKING",
+      "true_class": "WALKING_DOWNSTAIRS",
+      "true_support": 420
+    },
+    {
+      "count": 8,
+      "pct_of_true_class": 0.016985138004246284,
+      "predicted_class": "WALKING",
+      "true_class": "WALKING_UPSTAIRS",
+      "true_support": 471
+    },
+    {
+      "count": 5,
+      "pct_of_true_class": 0.010183299389002037,
+      "predicted_class": "LAYING",
+      "true_class": "SITTING",
+      "true_support": 491
+    },
+    {
+      "count": 3,
+      "pct_of_true_class": 0.006048387096774193,
+      "predicted_class": "WALKING_DOWNSTAIRS",
+      "true_class": "WALKING",
+      "true_support": 496
+    },
+    {
+      "count": 3,
+      "pct_of_true_class": 0.005639097744360902,
+      "predicted_class": "WALKING_UPSTAIRS",
+      "true_class": "STANDING",
+      "true_support": 532
+    }
+  ]
+}

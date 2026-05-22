@@ -1,0 +1,31 @@
+{
+  "host_info": {
+    "platform": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "processor": "x86_64",
+    "python": "3.11.6"
+  },
+  "input_shape": [
+    1,
+    128,
+    6
+  ],
+  "max_ms": 0.6137079981272109,
+  "mean_ms": 0.04670691893261392,
+  "median_ms": 0.03987500167568214,
+  "min_ms": 0.03675799962366,
+  "model_path": "outputs/v5/uci_har_tinytcn/model.tflite",
+  "model_size_kb": 65.10546875,
+  "note": "CPU benchmark on the developer machine, not Android device latency.",
+  "output_shape": [
+    1,
+    6
+  ],
+  "p50_ms": 0.03987500167568214,
+  "p90_ms": 0.07270110036188271,
+  "p95_ms": 0.0853465988257085,
+  "p99_ms": 0.11667333019431674,
+  "runs": 1000,
+  "seed": 20260521,
+  "std_ms": 0.026873392535343793,
+  "warmup": 50
+}

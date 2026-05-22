@@ -1,0 +1,45 @@
+{
+  "artifacts_dir": "outputs/qualcomm_ai_hub/v5/artifacts_real/tiny_cnn1d/npu/run_04/jp8wd6rqp",
+  "by_layer_ms": 0.31,
+  "cold_load_ms": 276.682,
+  "compute_unit_requested": "npu",
+  "created_at": "2026-05-21T18:33:17.511916+00:00",
+  "delegate": "QNN/HTP",
+  "delegate_partitions": 1,
+  "delegate_type": "TfLiteQnnDelegate",
+  "delegated_nodes": 24,
+  "device": "Samsung Galaxy S24 (Family)",
+  "downloaded_artifacts": {
+    "logs": [
+      "outputs/qualcomm_ai_hub/v5/artifacts_real/tiny_cnn1d/npu/run_04/jp8wd6rqp/logs/jp8wd6rqp_runtime.log"
+    ],
+    "profile": "outputs/qualcomm_ai_hub/v5/artifacts_real/tiny_cnn1d/npu/run_04/jp8wd6rqp/profile.json"
+  },
+  "energy_mj": null,
+  "energy_power_available": false,
+  "energy_power_notes": "No energy/power fields were exposed in downloaded AI Hub profile artifacts for this job.",
+  "fallback_entries": 0,
+  "fallback_ops": {},
+  "fully_delegated": true,
+  "input_shape": [
+    1,
+    128,
+    6
+  ],
+  "job_id": "jp8wd6rqp",
+  "job_url": "https://workbench.aihub.qualcomm.com/jobs/jp8wd6rqp/",
+  "latency_ms": 0.064,
+  "memory_increase_max_mb": 0.031738,
+  "memory_increase_min_mb": 0.0,
+  "memory_mb": 0.031738,
+  "model": "outputs/v5/uci_har_tiny_cnn1d/model.tflite",
+  "notes": "submitted with Qualcomm AI Hub Python client; export structured metrics from downloaded/runtime logs with scripts/export_qaihub_profile_metrics.py",
+  "output_json": "outputs/qualcomm_ai_hub/v5/repeated_real/tiny_cnn1d/npu/run_04.json",
+  "power_mw": null,
+  "runtime_log_records": 1,
+  "runtime_path": "cpu_and_npu",
+  "status": "success",
+  "target_runtime": "tflite",
+  "total_nodes": 24,
+  "warm_load_mean_ms": 153.105333
+}

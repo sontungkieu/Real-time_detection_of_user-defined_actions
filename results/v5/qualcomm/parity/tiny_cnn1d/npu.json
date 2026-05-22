@@ -1,0 +1,45 @@
+{
+  "ai_hub_output_sha256": "0915a1d4a8aef59daae38ec103a8a6ceabbce869d877d00ed16290886622cecf",
+  "ai_hub_output_shape": [
+    1,
+    6
+  ],
+  "ai_hub_status": "success",
+  "ai_hub_top_class": 4,
+  "ai_hub_top_score": 0.4887695610523224,
+  "allclose": false,
+  "allclose_at_1e_3": true,
+  "allclose_at_1e_4": false,
+  "atol": 0.0001,
+  "compute_unit_requested": "npu",
+  "created_at": "2026-05-21T19:37:32.651983+00:00",
+  "device": "Samsung Galaxy S24 (Family)",
+  "input_name": "serving_default_input_layer:0",
+  "input_sha256": "8d731b9e2e704412c6bd0f93a2585c80870f4157af8f8d2aa7d7f279091a6b75",
+  "input_shape": [
+    1,
+    128,
+    6
+  ],
+  "job_id": "j5mv1dew5",
+  "job_url": "https://workbench.aihub.qualcomm.com/jobs/j5mv1dew5/",
+  "local_output_sha256": "87b233432d6d962a6414f426fe783805812dddb2fe0f763345fc571f92ddeecd",
+  "local_output_shape": [
+    1,
+    6
+  ],
+  "local_top_class": 4,
+  "local_top_score": 0.48902153968811035,
+  "max_abs_diff": 0.0003811269998550415,
+  "mean_abs_diff": 0.0001332978717982769,
+  "median_abs_diff": 8.048210293054581e-05,
+  "model": "outputs/v5/uci_har_tiny_cnn1d/model.tflite",
+  "notes": "numeric parity compared local TFLite output against AI Hub output",
+  "output_name_ai_hub": "StatefulPartitionedCall_1:0",
+  "output_name_local": "StatefulPartitionedCall_1:0",
+  "p95_abs_diff": 0.0003488399088382721,
+  "rtol": 0.0001,
+  "seed": 20260521,
+  "status": "failed",
+  "top_class_match": true
+}

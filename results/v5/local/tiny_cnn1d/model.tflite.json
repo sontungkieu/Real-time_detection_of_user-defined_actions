@@ -1,0 +1,7 @@
+{
+  "float16": false,
+  "keras_size_mb": 0.2879190444946289,
+  "model_path": "outputs/v5/uci_har_tiny_cnn1d/model.keras",
+  "tflite_path": "outputs/v5/uci_har_tiny_cnn1d/model.tflite",
+  "tflite_size_mb": 0.08739089965820312
+}

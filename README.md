@@ -321,6 +321,8 @@ V5 extends the v4 TinyTCN finding into a CPU/GPU/NPU complexity sweep. The main 
 
 Detailed local report can be regenerated at `reports/report_v5_cpu_gpu_npu_complexity_sweep.md` from ignored benchmark artifacts with `scripts/generate_v5_report.py`.
 
+Curated v5 experiment data, sanitized per-run summaries, and generated figures are tracked in [results/v5](results/v5/README.md). Regenerate the tracked result package with `scripts/prepare_v5_results.py`, then regenerate figures with `scripts/generate_v5_result_figures.py`.
+
 Local UCI HAR TFLite results on this development machine:
 
 | Model | Params | Accuracy | TFLite size | Mean ms | P95 ms | Space/Batch fallback markers |
@@ -342,6 +344,14 @@ Qualcomm AI Hub v5 repeated profile results on Samsung Galaxy S24 (Family), 5 re
 | MediumConv1D | CPU | 5 / 5 | 0.184 | 0.188 | 0.044 | not exposed |
 | MediumConv1D | GPU | 5 / 5 | 0.665 | 0.790 | 0.089 | not exposed |
 | MediumConv1D | NPU | 5 / 5 | 0.098 | 0.104 | 0.029 | not exposed |
+
+![V5 local accuracy and latency](results/v5/figures/v5_local_accuracy_latency.png)
+
+![V5 Qualcomm latency by runtime](results/v5/figures/v5_qaihub_latency_by_runtime.png)
+
+![V5 Qualcomm memory and cold load](results/v5/figures/v5_qaihub_memory_coldload.png)
+
+![V5 delegate coverage and numeric parity](results/v5/figures/v5_delegate_and_parity.png)
 
 Energy/power fields were checked in downloaded AI Hub profile artifacts and runtime logs. The current device tooling artifacts did not expose numeric energy or power measurements, so those columns are intentionally marked `not exposed`.
 

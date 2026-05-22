@@ -68,6 +68,8 @@ outputs/qualcomm_ai_hub/
 *_runtime.log
 results/*
 !results/README.md
+!results/v5/
+!results/v5/**
 
 *.tflite
 *.h5

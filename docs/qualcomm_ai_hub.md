@@ -218,6 +218,19 @@ Profile summaries parse downloaded runtime logs when available and check downloa
 
 The report must distinguish local CPU TFLite latency, AI Hub hosted-device profile status, Workbench/runtime-log metrics, energy/power availability, and Android app end-to-end latency.
 
+Prepare tracked curated result summaries and figures from ignored local outputs:
+
+```bash
+uv run python scripts/prepare_v5_results.py \
+  --outputs-dir outputs/v5 \
+  --qualcomm-dir outputs/qualcomm_ai_hub/v5 \
+  --results-dir results/v5
+
+uv run python scripts/generate_v5_result_figures.py \
+  --results-dir results/v5 \
+  --figures-dir results/v5/figures
+```
+
 ## Profile UCI HAR 1D-CNN Fallback
 
 ```bash
