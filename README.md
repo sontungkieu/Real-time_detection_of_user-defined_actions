@@ -319,7 +319,7 @@ For this small TinyTCN model, the requested NPU path completes successfully but 
 
 V5 extends the v4 TinyTCN finding into a CPU/GPU/NPU complexity sweep. The main deployment question is when a model becomes large and accelerator-friendly enough for GPU or NPU execution to justify delegate setup, dispatch, memory movement, and fallback overhead.
 
-Detailed report: [reports/report_v5_cpu_gpu_npu_complexity_sweep.md](reports/report_v5_cpu_gpu_npu_complexity_sweep.md)
+Detailed local report can be regenerated at `reports/report_v5_cpu_gpu_npu_complexity_sweep.md` from ignored benchmark artifacts with `scripts/generate_v5_report.py`.
 
 Local UCI HAR TFLite results on this development machine:
 
