@@ -159,6 +159,65 @@ uv run --extra qualcomm python scripts/qaihub_numeric_parity.py \
 
 The default tolerance is `atol=1e-4`, `rtol=1e-4`. CPU should normally be near bit-level parity. NPU/QNN can have larger floating-point differences, so report both strict allclose status and task-level behavior such as top-class match.
 
+## V5 CPU/GPU/NPU Complexity Sweep
+
+Train, export, benchmark, and audit the three required UCI HAR models:
+
+```bash
+uv run python scripts/train_har.py --config configs/uci_har_tinytcn_v5.yaml
+uv run python scripts/train_har.py --config configs/uci_har_tiny_cnn1d.yaml
+uv run python scripts/train_har.py --config configs/uci_har_medium_conv1d.yaml
+
+uv run python scripts/export_tflite.py --model-dir outputs/v5/uci_har_tinytcn --output outputs/v5/uci_har_tinytcn/model.tflite
+uv run python scripts/export_tflite.py --model-dir outputs/v5/uci_har_tiny_cnn1d --output outputs/v5/uci_har_tiny_cnn1d/model.tflite
+uv run python scripts/export_tflite.py --model-dir outputs/v5/uci_har_medium_conv1d --output outputs/v5/uci_har_medium_conv1d/model.tflite
+
+uv run python scripts/benchmark_tflite.py --model outputs/v5/uci_har_tinytcn/model.tflite --input-shape 1,128,6 --warmup 50 --runs 1000 --seed 20260521 --output outputs/v5/uci_har_tinytcn/local_benchmark.json
+uv run python scripts/benchmark_tflite.py --model outputs/v5/uci_har_tiny_cnn1d/model.tflite --input-shape 1,128,6 --warmup 50 --runs 1000 --seed 20260521 --output outputs/v5/uci_har_tiny_cnn1d/local_benchmark.json
+uv run python scripts/benchmark_tflite.py --model outputs/v5/uci_har_medium_conv1d/model.tflite --input-shape 1,128,6 --warmup 50 --runs 1000 --seed 20260521 --output outputs/v5/uci_har_medium_conv1d/local_benchmark.json
+
+uv run python scripts/op_audit_tflite.py --model outputs/v5/uci_har_tinytcn/model.tflite --output outputs/v5/uci_har_tinytcn/op_audit.json
+uv run python scripts/op_audit_tflite.py --model outputs/v5/uci_har_tiny_cnn1d/model.tflite --output outputs/v5/uci_har_tiny_cnn1d/op_audit.json
+uv run python scripts/op_audit_tflite.py --model outputs/v5/uci_har_medium_conv1d/model.tflite --output outputs/v5/uci_har_medium_conv1d/op_audit.json
+```
+
+Run the full Qualcomm matrix:
+
+```bash
+uv run --extra qualcomm python scripts/run_qaihub_repeated_profiles.py \
+  --models \
+    outputs/v5/uci_har_tinytcn/model.tflite \
+    outputs/v5/uci_har_tiny_cnn1d/model.tflite \
+    outputs/v5/uci_har_medium_conv1d/model.tflite \
+  --model-names tinytcn tiny_cnn1d medium_conv1d \
+  --device "Samsung Galaxy S24 (Family)" \
+  --compute-units cpu,gpu,npu \
+  --input-shape 1,128,6 \
+  --runs 5 \
+  --wait \
+  --artifacts-dir outputs/qualcomm_ai_hub/v5/artifacts_real \
+  --out-dir outputs/qualcomm_ai_hub/v5/repeated_real
+```
+
+Aggregate repeated profile summaries and generate the v5 report:
+
+```bash
+uv run python scripts/aggregate_qaihub_profiles.py \
+  --input-dir outputs/qualcomm_ai_hub/v5/repeated_real \
+  --output outputs/qualcomm_ai_hub/v5/aggregate_summary.json \
+  --markdown outputs/qualcomm_ai_hub/v5/aggregate_summary.md
+
+uv run python scripts/generate_v5_report.py \
+  --local-results outputs/v5 \
+  --qualcomm-summary outputs/qualcomm_ai_hub/v5/aggregate_summary.json \
+  --parity-results outputs/qualcomm_ai_hub/v5/parity_real \
+  --output reports/report_v5_cpu_gpu_npu_complexity_sweep.md
+```
+
+Profile summaries parse downloaded runtime logs when available and check downloaded profile artifacts for energy/power fields. If the device tooling does not expose numeric energy or power values, the report must mark those fields as missing/not exposed rather than estimating them.
+
+The report must distinguish local CPU TFLite latency, AI Hub hosted-device profile status, Workbench/runtime-log metrics, energy/power availability, and Android app end-to-end latency.
+
 ## Profile UCI HAR 1D-CNN Fallback
 
 ```bash
@@ -196,7 +255,7 @@ Those files are local artifacts and must remain untracked.
 
 ## Result Table Template
 
-| Dataset | Model | Device | Runtime | Compute unit | Latency ms | Memory MB | Status | Notes |
-| --- | --- | --- | --- | --- | ---: | ---: | --- | --- |
-| UCI HAR | TinyTCN | pending | TFLite | CPU | pending | pending | pending | Qualcomm AI Hub |
-| UCI HAR | TinyTCN | pending | TFLite | NPU | pending | pending | pending | Qualcomm AI Hub |
+| Dataset | Model | Device | Runtime | Compute unit | Latency ms | Memory MB | Energy mJ | Power mW | Status | Notes |
+| --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- |
+| UCI HAR | TinyTCN | pending | TFLite | CPU | pending | pending | pending | pending | pending | Qualcomm AI Hub |
+| UCI HAR | TinyTCN | pending | TFLite | NPU | pending | pending | pending | pending | pending | Qualcomm AI Hub |

@@ -19,17 +19,37 @@ PROFILE_SCRIPT = REPO_ROOT / "scripts" / "profile_qualcomm_ai_hub.py"
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", default="outputs/uci_har_tinytcn/model.tflite")
+    parser.add_argument(
+        "--models",
+        nargs="+",
+        default=None,
+        help="Optional list of model paths for matrix profiling.",
+    )
+    parser.add_argument(
+        "--model-names",
+        nargs="+",
+        default=None,
+        help="Names matching --models. Defaults to model parent directory names.",
+    )
     parser.add_argument("--input-shape", required=True)
     parser.add_argument("--device", default="Samsung Galaxy S24 (Family)")
     parser.add_argument(
         "--compute-units",
         nargs="+",
-        choices=("cpu", "gpu", "npu", "auto"),
         default=["cpu", "npu"],
+        help="Compute units as space-separated values or comma-separated groups.",
     )
     parser.add_argument("--runs", type=int, default=3)
     parser.add_argument("--env-file", default=".secrets/.env")
     parser.add_argument("--out-dir", default="outputs/qualcomm_ai_hub/repeated")
+    parser.add_argument(
+        "--artifacts-dir",
+        default=None,
+        help=(
+            "Optional base directory for downloaded AI Hub profile artifacts. "
+            "Each run is stored under model/unit/run/job_id."
+        ),
+    )
     parser.add_argument("--wait", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--stop-on-failure", action="store_true")
@@ -44,64 +64,82 @@ def main() -> int:
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    model_specs = _model_specs(args)
+    compute_units = _parse_compute_units(args.compute_units)
     rows: list[dict[str, Any]] = []
     return_code = 0
 
-    for compute_unit in args.compute_units:
-        for run_index in range(1, args.runs + 1):
-            output_json = out_dir / f"{compute_unit}_run_{run_index:02d}.json"
-            command = [
-                sys.executable,
-                str(PROFILE_SCRIPT),
-                "--model",
-                args.model,
-                "--input-shape",
-                args.input_shape,
-                "--device",
-                args.device,
-                "--compute-unit",
-                compute_unit,
-                "--env-file",
-                args.env_file,
-                "--output-json",
-                str(output_json),
-            ]
-            if args.wait:
-                command.append("--wait")
-            if args.dry_run:
-                command.append("--dry-run")
+    for model_name, model_path in model_specs:
+        for compute_unit in compute_units:
+            for run_index in range(1, args.runs + 1):
+                output_json = (
+                    out_dir / model_name / compute_unit / f"run_{run_index:02d}.json"
+                )
+                command = [
+                    sys.executable,
+                    str(PROFILE_SCRIPT),
+                    "--model",
+                    str(model_path),
+                    "--input-shape",
+                    args.input_shape,
+                    "--device",
+                    args.device,
+                    "--compute-unit",
+                    compute_unit,
+                    "--env-file",
+                    args.env_file,
+                    "--output-json",
+                    str(output_json),
+                ]
+                if args.wait:
+                    command.append("--wait")
+                if args.dry_run:
+                    command.append("--dry-run")
+                if args.artifacts_dir:
+                    artifacts_dir = (
+                        Path(args.artifacts_dir)
+                        / model_name
+                        / compute_unit
+                        / f"run_{run_index:02d}"
+                    )
+                    command.extend(["--artifacts-dir", str(artifacts_dir)])
 
-            print(f"[{compute_unit} run {run_index}/{args.runs}] submitting profile")
-            result = subprocess.run(
-                command,
-                cwd=REPO_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            if result.stdout:
-                print(result.stdout.strip())
-            if result.stderr:
-                print(result.stderr.strip(), file=sys.stderr)
+                print(
+                    f"[{model_name} {compute_unit} run {run_index}/{args.runs}] "
+                    "submitting profile"
+                )
+                result = subprocess.run(
+                    command,
+                    cwd=REPO_ROOT,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                if result.stdout:
+                    print(result.stdout.strip())
+                if result.stderr:
+                    print(result.stderr.strip(), file=sys.stderr)
 
-            row = _load_summary_row(output_json)
-            row.update(
-                {
-                    "run_index": run_index,
-                    "compute_unit": compute_unit,
-                    "return_code": result.returncode,
-                    "summary_json": str(output_json),
-                }
-            )
-            rows.append(row)
+                row = _load_summary_row(output_json)
+                row.update(
+                    {
+                        "model_name": model_name,
+                        "model_path": str(model_path),
+                        "run_index": run_index,
+                        "compute_unit": compute_unit,
+                        "return_code": result.returncode,
+                        "summary_json": str(output_json),
+                    }
+                )
+                rows.append(row)
 
-            if result.returncode != 0:
-                return_code = result.returncode
-                if args.stop_on_failure:
-                    _write_manifest(out_dir, args, rows)
-                    return return_code
+                if result.returncode != 0:
+                    return_code = result.returncode
+                    if args.stop_on_failure:
+                        _write_manifest(out_dir, args, model_specs, compute_units, rows)
+                        return return_code
 
-    _write_manifest(out_dir, args, rows)
+    _write_manifest(out_dir, args, model_specs, compute_units, rows)
     return return_code
 
 
@@ -115,22 +153,39 @@ def _load_summary_row(path: Path) -> dict[str, Any]:
         "job_url": summary.get("job_url"),
         "latency_ms": summary.get("latency_ms"),
         "memory_mb": summary.get("memory_mb"),
+        "energy_mj": summary.get("energy_mj"),
+        "power_mw": summary.get("power_mw"),
+        "energy_power_available": summary.get("energy_power_available"),
+        "runtime_path": summary.get("runtime_path"),
+        "delegate": summary.get("delegate"),
+        "delegated_nodes": summary.get("delegated_nodes"),
+        "total_nodes": summary.get("total_nodes"),
+        "fully_delegated": summary.get("fully_delegated"),
+        "fallback_ops": summary.get("fallback_ops"),
         "notes": summary.get("notes"),
     }
 
 
 def _write_manifest(
-    out_dir: Path, args: argparse.Namespace, rows: list[dict[str, Any]]
+    out_dir: Path,
+    args: argparse.Namespace,
+    model_specs: list[tuple[str, Path]],
+    compute_units: list[str],
+    rows: list[dict[str, Any]],
 ) -> None:
     manifest = {
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "model": args.model,
+        "models": [
+            {"model_name": model_name, "model_path": str(model_path)}
+            for model_name, model_path in model_specs
+        ],
         "input_shape": args.input_shape,
         "device": args.device,
-        "compute_units": args.compute_units,
+        "compute_units": compute_units,
         "runs": args.runs,
         "wait": args.wait,
         "dry_run": args.dry_run,
+        "artifacts_dir": args.artifacts_dir,
         "rows": rows,
     }
     (out_dir / "manifest.json").write_text(
@@ -146,6 +201,31 @@ def _write_manifest(
             writer.writerows(rows)
 
     print(f"Wrote repeated profile manifest to {out_dir / 'manifest.json'}")
+
+
+def _model_specs(args: argparse.Namespace) -> list[tuple[str, Path]]:
+    model_paths = [Path(path) for path in (args.models or [args.model])]
+    if args.model_names is not None and len(args.model_names) != len(model_paths):
+        raise SystemExit("--model-names must have the same length as --models")
+
+    names = args.model_names or [path.parent.name or path.stem for path in model_paths]
+    return [(name, path) for name, path in zip(names, model_paths, strict=True)]
+
+
+def _parse_compute_units(values: list[str]) -> list[str]:
+    allowed = {"cpu", "gpu", "npu", "all", "auto"}
+    units: list[str] = []
+    for value in values:
+        for unit in value.split(","):
+            unit = unit.strip().lower()
+            if not unit:
+                continue
+            if unit not in allowed:
+                raise SystemExit(
+                    f"Unsupported compute unit {unit!r}; expected one of {sorted(allowed)}"
+                )
+            units.append(unit)
+    return units
 
 
 if __name__ == "__main__":

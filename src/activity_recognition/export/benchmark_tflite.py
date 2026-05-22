@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import platform
 from pathlib import Path
 from time import perf_counter
 
@@ -15,6 +16,7 @@ def benchmark_tflite_model(
     input_shape: tuple[int, ...],
     runs: int = 500,
     warmup: int = 50,
+    seed: int = 42,
     out_path: str | Path | None = None,
 ) -> dict[str, object]:
     """Benchmark a TFLite model on the current machine's CPU."""
@@ -31,31 +33,47 @@ def benchmark_tflite_model(
     output_details = interpreter.get_output_details()
 
     sample = _make_sample(
-        input_shape, input_details[0]["dtype"], input_details[0].get("quantization")
+        input_shape,
+        input_details[0]["dtype"],
+        input_details[0].get("quantization"),
+        seed=seed,
     )
     for _ in range(warmup):
         interpreter.set_tensor(input_details[0]["index"], sample)
         interpreter.invoke()
-        _ = interpreter.get_tensor(output_details[0]["index"])
+        output = interpreter.get_tensor(output_details[0]["index"])
 
     latencies_ms: list[float] = []
     for _ in range(runs):
         start = perf_counter()
         interpreter.set_tensor(input_details[0]["index"], sample)
         interpreter.invoke()
-        _ = interpreter.get_tensor(output_details[0]["index"])
+        output = interpreter.get_tensor(output_details[0]["index"])
         latencies_ms.append((perf_counter() - start) * 1000)
 
     latencies = np.asarray(latencies_ms, dtype=np.float64)
     result = {
         "model_path": str(model_path),
         "input_shape": list(input_shape),
+        "output_shape": list(output.shape),
         "runs": runs,
         "warmup": warmup,
+        "seed": seed,
         "mean_ms": float(latencies.mean()),
+        "std_ms": float(latencies.std(ddof=0)),
+        "min_ms": float(latencies.min()),
+        "max_ms": float(latencies.max()),
         "median_ms": float(np.median(latencies)),
+        "p50_ms": float(np.percentile(latencies, 50)),
+        "p90_ms": float(np.percentile(latencies, 90)),
         "p95_ms": float(np.percentile(latencies, 95)),
+        "p99_ms": float(np.percentile(latencies, 99)),
         "model_size_kb": model_path.stat().st_size / 1024,
+        "host_info": {
+            "platform": platform.platform(),
+            "processor": platform.processor(),
+            "python": platform.python_version(),
+        },
         "note": "CPU benchmark on the developer machine, not Android device latency.",
     }
 
@@ -69,8 +87,9 @@ def _make_sample(
     shape: tuple[int, ...],
     dtype: np.dtype,
     quantization: tuple[float, int] | None,
+    seed: int,
 ) -> np.ndarray:
-    rng = np.random.default_rng(42)
+    rng = np.random.default_rng(seed)
     sample = rng.normal(0.0, 1.0, size=shape).astype(np.float32)
     dtype = np.dtype(dtype)
     if dtype == np.float32:

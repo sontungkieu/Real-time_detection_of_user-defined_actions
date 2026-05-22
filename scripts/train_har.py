@@ -20,13 +20,27 @@ def parse_args() -> argparse.Namespace:
         "--seed", type=int, default=None, help="Override split/model seed."
     )
     parser.add_argument("--output-dir", default=None, help="Override output directory.")
+    parser.add_argument("--model", default=None, help="Override model.type.")
+    parser.add_argument("--epochs", type=int, default=None, help="Override epochs.")
+    parser.add_argument(
+        "--batch-size", type=int, default=None, help="Override batch size."
+    )
+    parser.add_argument(
+        "--learning-rate", type=float, default=None, help="Override learning rate."
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     train_from_config(
-        args.config, seed_override=args.seed, output_dir_override=args.output_dir
+        args.config,
+        seed_override=args.seed,
+        output_dir_override=args.output_dir,
+        model_override=args.model,
+        epochs_override=args.epochs,
+        batch_size_override=args.batch_size,
+        learning_rate_override=args.learning_rate,
     )
 
 

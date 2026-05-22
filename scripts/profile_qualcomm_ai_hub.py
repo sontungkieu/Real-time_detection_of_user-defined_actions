@@ -18,6 +18,11 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from activity_recognition.utils.secrets import get_qualcomm_api_key
 
+try:
+    from activity_recognition.utils.qaihub_metrics import parse_runtime_log
+except Exception:  # pragma: no cover - profiling should still submit without parser.
+    parse_runtime_log = None
+
 INSTALL_MESSAGE = "Install optional dependency: uv pip install qai-hub python-dotenv"
 CONFIGURE_MESSAGE = "Run: qai-hub configure --api_token <token>"
 STATUS_VALUES = {"success", "failed", "pending"}
@@ -29,7 +34,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input-shape", required=True)
     parser.add_argument("--device", default="Samsung Galaxy S24 (Family)")
     parser.add_argument(
-        "--compute-unit", choices=("cpu", "gpu", "npu", "auto"), default="cpu"
+        "--compute-unit",
+        choices=("cpu", "gpu", "npu", "all", "auto"),
+        default="cpu",
     )
     parser.add_argument("--target-runtime", default="tflite")
     parser.add_argument("--env-file", default=".secrets/.env")
@@ -263,6 +270,9 @@ def _base_summary(
         "status": normalized_status,
         "latency_ms": None,
         "memory_mb": None,
+        "energy_mj": None,
+        "power_mw": None,
+        "energy_power_available": None,
         "notes": notes,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "output_json": str(output_json),
@@ -344,6 +354,196 @@ def _download_job_artifacts(
         downloaded["logs_error"] = f"{type(exc).__name__}: {exc}"
 
     summary["downloaded_artifacts"] = downloaded
+    summary["artifacts_dir"] = str(output_dir)
+    _populate_summary_from_artifacts(summary, output_dir)
+
+
+def _populate_summary_from_artifacts(summary: dict[str, Any], output_dir: Path) -> None:
+    runtime_records = []
+    if parse_runtime_log is not None:
+        for path in _iter_artifact_files(output_dir):
+            if path.suffix.lower() not in {".log", ".txt"}:
+                continue
+            try:
+                text = path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            if "Tungsten" not in text and "Performed Inference" not in text:
+                continue
+            try:
+                record = parse_runtime_log(path)
+            except Exception as exc:
+                summary.setdefault("artifact_parse_errors", []).append(
+                    f"{path}: {type(exc).__name__}: {exc}"
+                )
+                continue
+            runtime_records.append(record)
+            _apply_runtime_metrics(summary, record)
+
+    energy_power_metrics: list[dict[str, Any]] = []
+    for path in _iter_artifact_files(output_dir):
+        if path.suffix.lower() != ".json":
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        energy_power_metrics.extend(_extract_energy_power_metrics(data))
+
+    summary["runtime_log_records"] = len(runtime_records)
+    summary["energy_power_available"] = bool(energy_power_metrics)
+    if energy_power_metrics:
+        summary["energy_power_metrics"] = energy_power_metrics[:50]
+        _apply_energy_power_candidates(summary, energy_power_metrics)
+    else:
+        summary["energy_power_notes"] = (
+            "No energy/power fields were exposed in downloaded AI Hub profile "
+            "artifacts for this job."
+        )
+
+
+def _apply_runtime_metrics(summary: dict[str, Any], record: dict[str, Any]) -> None:
+    timings = record.get("timings", {})
+    memory = record.get("memory", {})
+    delegate = record.get("delegate", {})
+    by_layer_summary = record.get("by_layer", {}).get("summary", {})
+
+    inference_us = timings.get("inference_us")
+    if isinstance(inference_us, int | float):
+        summary["latency_ms"] = round(float(inference_us) / 1000.0, 6)
+    cold_load_us = timings.get("cold_load_us")
+    if isinstance(cold_load_us, int | float):
+        summary["cold_load_ms"] = round(float(cold_load_us) / 1000.0, 6)
+    warm_mean_us = timings.get("warm_load_us_mean")
+    if isinstance(warm_mean_us, int | float):
+        summary["warm_load_mean_ms"] = round(float(warm_mean_us) / 1000.0, 6)
+    by_layer_us = timings.get("by_layer_us")
+    if isinstance(by_layer_us, int | float):
+        summary["by_layer_ms"] = round(float(by_layer_us) / 1000.0, 6)
+
+    inference_memory = memory.get("inference") or {}
+    if isinstance(inference_memory, dict):
+        summary["memory_mb"] = inference_memory.get("increase_max_mb")
+        summary["memory_increase_min_mb"] = inference_memory.get("increase_min_mb")
+        summary["memory_increase_max_mb"] = inference_memory.get("increase_max_mb")
+
+    summary["runtime_path"] = record.get("compute_unit_observed")
+    summary["delegate"] = delegate.get("name")
+    summary["delegate_type"] = delegate.get("delegate_type")
+    summary["delegated_nodes"] = delegate.get("delegated_nodes")
+    summary["total_nodes"] = delegate.get("total_nodes")
+    summary["delegate_partitions"] = delegate.get("partitions")
+    summary["fully_delegated"] = delegate.get("fully_delegated")
+    summary["fallback_entries"] = by_layer_summary.get("fallback_entries")
+    summary["fallback_ops"] = by_layer_summary.get("fallback_ops") or {}
+
+
+def _extract_energy_power_metrics(data: Any) -> list[dict[str, Any]]:
+    metrics: list[dict[str, Any]] = []
+
+    def walk(value: Any, path: str) -> None:
+        if len(metrics) >= 200:
+            return
+        if isinstance(value, dict):
+            unit = _first_text_value(value, "unit", "units")
+            for key, item in value.items():
+                child_path = f"{path}.{key}" if path else str(key)
+                if _is_number(item) and _looks_like_energy_power(child_path):
+                    metrics.append(
+                        _energy_power_entry(child_path, float(item), unit=unit)
+                    )
+                walk(item, child_path)
+        elif isinstance(value, list):
+            for index, item in enumerate(value):
+                walk(item, f"{path}[{index}]")
+
+    walk(data, "")
+    deduped: list[dict[str, Any]] = []
+    seen: set[tuple[str, float]] = set()
+    for metric in metrics:
+        key = (metric["path"], metric["value"])
+        if key not in seen:
+            seen.add(key)
+            deduped.append(metric)
+    return deduped
+
+
+def _apply_energy_power_candidates(
+    summary: dict[str, Any], metrics: list[dict[str, Any]]
+) -> None:
+    for metric in metrics:
+        if summary.get("energy_mj") is None and metric.get("kind") == "energy":
+            converted = metric.get("value_mj")
+            if converted is not None:
+                summary["energy_mj"] = converted
+        if summary.get("power_mw") is None and metric.get("kind") == "power":
+            converted = metric.get("value_mw")
+            if converted is not None:
+                summary["power_mw"] = converted
+
+
+def _energy_power_entry(path: str, value: float, unit: str | None) -> dict[str, Any]:
+    lower_path = path.lower()
+    lower_unit = (unit or "").lower()
+    kind = "energy" if "energy" in lower_path else "power"
+    entry: dict[str, Any] = {
+        "path": path,
+        "kind": kind,
+        "value": value,
+        "unit": unit,
+    }
+    if kind == "energy":
+        entry["value_mj"] = _convert_energy_to_mj(value, lower_path, lower_unit)
+    else:
+        entry["value_mw"] = _convert_power_to_mw(value, lower_path, lower_unit)
+    return entry
+
+
+def _convert_energy_to_mj(
+    value: float, lower_path: str, lower_unit: str
+) -> float | None:
+    token = f"{lower_path} {lower_unit}"
+    if "uj" in token or "microjoule" in token:
+        return value / 1000.0
+    if "mj" in token or "millijoule" in token:
+        return value
+    if re.search(r"(^|[^a-z])j(oule)?s?([^a-z]|$)", token):
+        return value * 1000.0
+    return None
+
+
+def _convert_power_to_mw(
+    value: float, lower_path: str, lower_unit: str
+) -> float | None:
+    token = f"{lower_path} {lower_unit}"
+    if "uw" in token or "microwatt" in token:
+        return value / 1000.0
+    if "mw" in token or "milliwatt" in token:
+        return value
+    if re.search(r"(^|[^a-z])w(att)?s?([^a-z]|$)", token):
+        return value * 1000.0
+    return None
+
+
+def _looks_like_energy_power(path: str) -> bool:
+    lower = path.lower()
+    return "energy" in lower or "power" in lower
+
+
+def _first_text_value(data: dict[str, Any], *keys: str) -> str | None:
+    for key in keys:
+        value = data.get(key)
+        if isinstance(value, str):
+            return value
+    return None
+
+
+def _is_number(value: Any) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool)
+
+
+def _iter_artifact_files(output_dir: Path) -> list[Path]:
+    return [path for path in sorted(output_dir.rglob("*")) if path.is_file()]
 
 
 def _extract_job_id(output: str) -> str | None:
